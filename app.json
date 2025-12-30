@@ -20,7 +20,8 @@
         "foregroundImage": "./assets/logo-app.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.huathai.MarketApp"
     },
     "web": {
       "favicon": "./assets/logo-app.png"
@@ -29,6 +30,9 @@
       "eas": {
         "projectId": "98b8b276-6498-4c85-a5cc-9e6a28f85c31"
       }
-    }
+    },
+    "plugins": [
+      "expo-font"
+    ]
   }
 }
