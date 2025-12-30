@@ -1,16 +1,17 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
-import { Platform, View, Text } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import HomeScreen from '../screens/HomeScreen';
 import GoldPriceScreen from '../screens/GoldPriceScreen';
+import ExchangeRateScreen from '../screens/ExchangeRateScreen';
 
 export type MainTabParamList = {
     Gas: undefined;
     Gold: undefined;
+    Exchange: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -28,13 +29,9 @@ export default function AppNavigator() {
                     tabBarActiveTintColor: '#e67e22',
                     tabBarInactiveTintColor: '#95a5a6',
                     tabBarStyle: {
-                        // FIX: Tăng chiều cao cơ bản lên 70 để thoải mái chứa Icon + Chữ
                         height: 70 + insets.bottom,
-
-                        // Căn chỉnh lại padding để nội dung nằm giữa đẹp hơn
                         paddingTop: 12,
                         paddingBottom: insets.bottom + 12,
-
                         backgroundColor: '#fff',
                         borderTopWidth: 1,
                         borderTopColor: '#f1f2f6',
@@ -47,8 +44,8 @@ export default function AppNavigator() {
                     tabBarLabelStyle: {
                         fontSize: 12,
                         fontWeight: '600',
-                        marginTop: 4, // Tăng khoảng cách giữa Icon và Chữ ra một chút cho thoáng
-                        marginBottom: 0, // Đảm bảo không có margin thừa ở dưới
+                        marginTop: 4,
+                        marginBottom: 0,
                     }
                 }}
             >
@@ -57,7 +54,7 @@ export default function AppNavigator() {
                     component={HomeScreen}
                     options={{
                         tabBarLabel: 'Giá Xăng',
-                        tabBarIcon: ({ color, size }) => (
+                        tabBarIcon: ({ color }) => (
                             <MaterialCommunityIcons name="gas-station" size={26} color={color} />
                         )
                     }}
@@ -67,8 +64,18 @@ export default function AppNavigator() {
                     component={GoldPriceScreen}
                     options={{
                         tabBarLabel: 'Giá Vàng',
-                        tabBarIcon: ({ color, size }) => (
+                        tabBarIcon: ({ color }) => (
                             <MaterialCommunityIcons name="gold" size={26} color={color} />
+                        )
+                    }}
+                />
+                <Tab.Screen
+                    name="Exchange"
+                    component={ExchangeRateScreen}
+                    options={{
+                        tabBarLabel: 'Tỷ Giá',
+                        tabBarIcon: ({ color }) => (
+                            <MaterialCommunityIcons name="currency-usd" size={26} color={color} />
                         )
                     }}
                 />
