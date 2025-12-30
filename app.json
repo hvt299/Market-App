@@ -20,7 +20,8 @@
         "foregroundImage": "./assets/logo-app.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.huathai.MarketApp"
     },
     "web": {
       "favicon": "./assets/logo-app.png"

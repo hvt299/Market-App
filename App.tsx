@@ -70,7 +70,19 @@ function MainScreen() {
     return '#34495e';
   };
 
-  const fetchGasPrices = async () => {
+  // Hàm lấy ngày hôm qua (dùng khi API trả về rỗng toàn bộ)
+  const getPreviousDay = (dateString: string) => {
+    const date = new Date(dateString);
+    date.setDate(date.getDate() - 1);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Hàm gọi API (Có tham số dateStr để hỗ trợ gọi đệ quy lùi ngày)
+  const fetchGasPrices = async (dateStr?: string) => {
+    // 1. Kiểm tra mạng
     const netState = await NetInfo.fetch();
     if (!netState.isConnected) {
       setIsConnected(false);
@@ -82,23 +94,61 @@ function MainScreen() {
     setIsConnected(true);
 
     try {
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = String(today.getMonth() + 1).padStart(2, '0');
-      const day = String(today.getDate()).padStart(2, '0');
-      const dateString = `${year}-${month}-${day}`;
-
-      const apiUrl = `https://giaxanghomnay.com/api/pvdate/${dateString}`;
+      // 2. Xác định ngày cần lấy (Nếu không truyền vào thì lấy hôm nay)
+      let targetDate = dateStr;
+      if (!targetDate) {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        targetDate = `${year}-${month}-${day}`;
+      }
+      const apiUrl = `https://giaxanghomnay.com/api/pvdate/${targetDate}`;
       const response = await axios.get(apiUrl);
 
-      if (Array.isArray(response.data) && response.data.length > 0) {
-        const todayData = response.data[0];
-        setGasData(Array.isArray(todayData) ? todayData : []);
-      } else {
-        setGasData([]);
+      // 3. LOGIC MỚI: TÌM DỮ LIỆU KHÁC RỖNG
+      let foundData = [];
+
+      if (Array.isArray(response.data)) {
+        // Duyệt qua từng phần tử trong mảng response
+        for (let i = 0; i < response.data.length; i++) {
+          const item = response.data[i];
+          // Nếu phần tử là mảng và có dữ liệu bên trong -> LẤY LUÔN và DỪNG
+          if (Array.isArray(item) && item.length > 0) {
+            foundData = item;
+            break;
+          }
+        }
       }
+
+      // 4. Xử lý kết quả tìm được
+      if (foundData.length > 0) {
+        setGasData(foundData);
+      } else {
+        // Trường hợp đặc biệt: Cả response đều rỗng (VD: ngày 1/1 trả về [[],[],[]])
+        // Ta sẽ thử gọi lại API với ngày hôm qua (Lùi 1 ngày)
+        const yesterday = getPreviousDay(targetDate);
+
+        // Chỉ lùi tối đa nếu ngày hiện tại chưa quá xa (tránh vòng lặp vô tận)
+        // Ở đây mình gọi đệ quy 1 lần
+        if (dateStr !== yesterday) {
+          await fetchGasPrices(yesterday);
+          return; // Kết thúc hàm hiện tại để hàm đệ quy chạy
+        } else {
+          setGasData([]); // Chịu thua, không có dữ liệu
+        }
+      }
+
     } catch (error) {
       console.error("Lỗi gọi API:", error);
+      // Nếu lỗi 404 hoặc lỗi mạng khi gọi ngày hiện tại, thử lùi ngày 1 lần
+      if (!dateStr) {
+        const today = new Date();
+        const yesterdayStr = getPreviousDay(today.toISOString().split('T')[0]);
+        console.log("Lỗi API, thử fallback về:", yesterdayStr);
+        await fetchGasPrices(yesterdayStr);
+        return;
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
