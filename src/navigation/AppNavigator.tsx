@@ -2,7 +2,6 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import HomeScreen from '../screens/HomeScreen';
 import GoldPriceScreen from '../screens/GoldPriceScreen';
@@ -17,8 +16,6 @@ export type MainTabParamList = {
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export default function AppNavigator() {
-    const insets = useSafeAreaInsets();
-
     return (
         <NavigationContainer>
             <Tab.Navigator
@@ -29,23 +26,18 @@ export default function AppNavigator() {
                     tabBarActiveTintColor: '#e67e22',
                     tabBarInactiveTintColor: '#95a5a6',
                     tabBarStyle: {
-                        height: 70 + insets.bottom,
-                        paddingTop: 12,
-                        paddingBottom: insets.bottom + 12,
                         backgroundColor: '#fff',
                         borderTopWidth: 1,
                         borderTopColor: '#f1f2f6',
+                        height: 60,
+                        paddingBottom: 8,
+                        paddingTop: 8,
                         elevation: 10,
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: -2 },
-                        shadowOpacity: 0.1,
-                        shadowRadius: 4,
                     },
                     tabBarLabelStyle: {
                         fontSize: 12,
                         fontWeight: '600',
-                        marginTop: 4,
-                        marginBottom: 0,
+                        marginBottom: 4,
                     }
                 }}
             >
