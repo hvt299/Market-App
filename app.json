@@ -4,11 +4,11 @@
     "slug": "MarketApp",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logo-app.png",
+    "icon": "./assets/logo-app.jpg",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/logo-app.png",
+      "image": "./assets/logo-app.jpg",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -17,14 +17,14 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logo-app.png",
+        "foregroundImage": "./assets/logo-app.jpg",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.huathai.MarketApp"
     },
     "web": {
-      "favicon": "./assets/logo-app.png"
+      "favicon": "./assets/logo-app.jpg"
     },
     "extra": {
       "eas": {
