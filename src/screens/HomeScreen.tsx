@@ -1,19 +1,32 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, Text, View, FlatList, ActivityIndicator, StatusBar, RefreshControl, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, Text, View, FlatList, ActivityIndicator, StatusBar, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import NetInfo from '@react-native-community/netinfo';
-
-import { GasItemCard } from '../components/GasItemCard';
+import { CircleHelp } from 'lucide-react-native';
 import { ZoneModal } from '../components/ZoneModal';
-import { getPreviousDay } from '../utils/helpers';
+import { GasDetailModal } from '../components/GasDetailModal';
+import { GasItemCard } from '../components/GasItemCard';
+import { getPreviousDay, formatDate } from '../utils/helpers';
+
+const PROVIDERS = [
+    { id: 'Petrolimex', name: 'Petrolimex' },
+    { id: 'Pvoil', name: 'PVOIL' },
+];
 
 export default function HomeScreen() {
     const [gasData, setGasData] = useState<any[]>([]);
+    const [lastUpdated, setLastUpdated] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [isConnected, setIsConnected] = useState(true);
+
+    const [selectedProvider, setSelectedProvider] = useState(PROVIDERS[0]);
     const [modalVisible, setModalVisible] = useState(false);
+    const [detailModalVisible, setDetailModalVisible] = useState(false);
+    const [selectedGasItem, setSelectedGasItem] = useState<any>(null);
+
+    const [rawData, setRawData] = useState<any>(null);
 
     useEffect(() => {
         const unsubscribe = NetInfo.addEventListener(state => {
@@ -46,26 +59,14 @@ export default function HomeScreen() {
             const apiUrl = `https://giaxanghomnay.com/api/pvdate/${targetDate}`;
             const response = await axios.get(apiUrl);
 
-            let foundData: any[] = [];
-            if (Array.isArray(response.data)) {
-                for (let i = 0; i < response.data.length; i++) {
-                    const item = response.data[i];
-                    if (Array.isArray(item) && item.length > 0) {
-                        foundData = item;
-                        break;
-                    }
-                }
-            }
-
-            if (foundData.length > 0) {
-                setGasData(foundData);
+            if (Array.isArray(response.data) && response.data.length >= 2) {
+                setRawData(response.data);
+                processDataForProvider(response.data, selectedProvider.id);
             } else {
                 const yesterday = getPreviousDay(targetDate);
                 if (dateStr !== yesterday) {
                     await fetchGasPrices(yesterday);
                     return;
-                } else {
-                    setGasData([]);
                 }
             }
         } catch (error) {
@@ -82,76 +83,116 @@ export default function HomeScreen() {
         }
     };
 
+    const processDataForProvider = (data: any, providerId: string) => {
+        if (!data) return;
+
+        let displayData: any[] = [];
+
+        if (providerId === 'Petrolimex') {
+            displayData = data[0] || [];
+        } else {
+            displayData = data[1] || [];
+        }
+
+        setGasData(displayData);
+
+        if (displayData.length > 0 && displayData[0].date) {
+            setLastUpdated(formatDate(displayData[0].date));
+        }
+    };
+
+    const handleSwitchProvider = (provider: any) => {
+        setSelectedProvider(provider);
+        processDataForProvider(rawData, provider.id);
+    };
+
     const onRefresh = useCallback(() => {
         setRefreshing(true);
         fetchGasPrices();
     }, []);
 
+    const openDetail = (item: any) => {
+        setSelectedGasItem(item);
+        setDetailModalVisible(true);
+    };
+
     return (
-        <>
-            <StatusBar barStyle="light-content" backgroundColor="#2c3e50" />
-            <SafeAreaView style={{ flex: 0, backgroundColor: '#2c3e50' }} edges={['top']} />
-            <SafeAreaView style={styles.bodySafeArea} edges={['left', 'right', 'bottom']}>
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor="#1e272e" />
 
-                {/* Header */}
-                <View style={styles.header}>
-                    <View>
-                        <Text style={styles.headerTitle}>MARKET APP</Text>
-                        <Text style={styles.headerSubtitle}>Giá xăng dầu Petrolimex</Text>
-                    </View>
-                    <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.infoButton}>
-                        <Text style={styles.infoButtonText}>?</Text>
-                    </TouchableOpacity>
-                </View>
+            <SafeAreaView style={styles.headerContainer} edges={['top', 'left', 'right']}>
+                <View style={styles.headerContent}>
+                    <Text style={styles.headerTitle}>GIÁ XĂNG DẦU</Text>
+                    {lastUpdated ? <Text style={styles.subHeader}>Cập nhật ngày: {lastUpdated}</Text> : null}
 
-                {!isConnected && (
-                    <View style={styles.offlineBanner}>
-                        <Text style={styles.offlineText}>Không có kết nối Internet</Text>
-                    </View>
-                )}
-
-                <View style={styles.body}>
-                    {loading ? (
-                        <View style={styles.center}>
-                            <ActivityIndicator size="large" color="#e67e22" />
-                            <Text style={{ marginTop: 10, color: '#7f8c8d' }}>Đang tải dữ liệu...</Text>
-                        </View>
-                    ) : (
-                        <FlatList
-                            data={gasData}
-                            keyExtractor={(item, index) => index.toString()}
-                            renderItem={({ item }) => <GasItemCard item={item} />}
-                            contentContainerStyle={styles.listContent}
-                            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#e67e22']} />}
-                            ListFooterComponent={<View style={{ height: 20 }} />}
-                            ListEmptyComponent={<Text style={styles.emptyText}>{isConnected ? "Không có dữ liệu hôm nay." : "Vui lòng kết nối mạng."}</Text>}
-                        />
+                    {selectedProvider.id === 'Petrolimex' && (
+                        <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.helpBtn}>
+                            <CircleHelp size={24} color="#FFF" />
+                        </TouchableOpacity>
                     )}
                 </View>
 
-                <ZoneModal visible={modalVisible} onClose={() => setModalVisible(false)} />
+                {/* Tabs */}
+                <View style={styles.tabsWrapper}>
+                    {PROVIDERS.map((p) => (
+                        <TouchableOpacity
+                            key={p.id}
+                            style={[styles.tabItem, selectedProvider.id === p.id && styles.activeTab]}
+                            onPress={() => handleSwitchProvider(p)}
+                        >
+                            <Text style={[styles.tabText, selectedProvider.id === p.id && styles.activeTabText]}>{p.name}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
             </SafeAreaView>
-        </>
+
+            <View style={styles.body}>
+                {loading ? (
+                    <ActivityIndicator size="large" color="#e67e22" style={{ marginTop: 50 }} />
+                ) : (
+                    <FlatList
+                        data={gasData}
+                        keyExtractor={(item, index) => index.toString()}
+                        renderItem={({ item }) => (
+                            <GasItemCard
+                                item={item}
+                                providerId={selectedProvider.id}
+                                onPress={() => openDetail(item)}
+                            />
+                        )}
+                        contentContainerStyle={styles.list}
+                        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#e67e22']} />}
+                        ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 20, color: '#999' }}>Không có dữ liệu</Text>}
+                    />
+                )}
+            </View>
+
+            <ZoneModal visible={modalVisible} onClose={() => setModalVisible(false)} />
+
+            <GasDetailModal
+                visible={detailModalVisible}
+                onClose={() => setDetailModalVisible(false)}
+                gasItem={selectedGasItem}
+                provider={selectedProvider.id}
+            />
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    bodySafeArea: { flex: 1, backgroundColor: '#ecf0f1' },
-    body: { flex: 1, backgroundColor: '#ecf0f1' },
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: {
-        padding: 20, backgroundColor: '#2c3e50', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5, zIndex: 10
-    },
-    headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#FFF', letterSpacing: 1 },
-    headerSubtitle: { fontSize: 12, color: '#bdc3c7', marginTop: 2 },
-    infoButton: {
-        width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)',
-        justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)'
-    },
-    infoButtonText: { color: '#FFF', fontWeight: 'bold', fontSize: 18 },
-    offlineBanner: { backgroundColor: '#c0392b', padding: 10, alignItems: 'center' },
-    offlineText: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
-    listContent: { padding: 16 },
-    emptyText: { textAlign: 'center', marginTop: 50, color: '#7f8c8d' },
+    container: { flex: 1, backgroundColor: '#F5F7FA' },
+    headerContainer: { backgroundColor: '#1e272e', paddingBottom: 10 },
+    headerContent: { alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, marginBottom: 10 },
+    headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#FFF', textTransform: 'uppercase' },
+    subHeader: { fontSize: 12, color: '#bdc3c7', marginTop: 4, fontStyle: 'italic' },
+    helpBtn: { position: 'absolute', right: 20, top: 10 },
+
+    tabsWrapper: { flexDirection: 'row', marginHorizontal: 16, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: 4 },
+    tabItem: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 6 },
+    activeTab: { backgroundColor: '#e67e22' },
+    tabText: { color: '#bdc3c7', fontWeight: '600', fontSize: 13 },
+    activeTabText: { color: '#FFF' },
+
+    body: { flex: 1 },
+    list: { padding: 16 },
 });

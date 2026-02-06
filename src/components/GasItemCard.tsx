@@ -1,63 +1,86 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { formatCurrency, getGasColor } from '../utils/helpers';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { Fuel } from 'lucide-react-native';
+import { formatCurrency, getLogo, CARD_STYLES } from '../utils/helpers';
 
-interface GasItemProps {
+interface GasItemCardProps {
     item: any;
+    providerId: string;
+    onPress: () => void;
 }
 
-export const GasItemCard: React.FC<GasItemProps> = ({ item }) => {
-    const mainColor = getGasColor(item.title);
-    const badgeText = item.title.includes('95') ? '95' : item.title.includes('E5') ? 'E5' : 'DO';
+export const GasItemCard: React.FC<GasItemCardProps> = ({ item, providerId, onPress }) => {
+    const logoUrl = getLogo(providerId);
+    const isPvoil = providerId === 'Pvoil';
 
     return (
-        <View style={styles.card}>
-            <View style={styles.cardHeader}>
-                <View style={[styles.badge, { backgroundColor: mainColor }]}>
-                    <Text style={styles.badgeText}>{badgeText}</Text>
-                </View>
-                <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={styles.itemName}>{item.title}</Text>
-                    <Text style={styles.itemDate}>Cập nhật: {item.updated_at?.substring(0, 10)}</Text>
-                </View>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.priceRow}>
-                <View style={styles.priceBlock}>
-                    <Text style={styles.zoneTitle}>VÙNG 1</Text>
-                    <Text style={[styles.priceText, { color: '#333' }]}>{formatCurrency(item.zone1_price)}</Text>
-                    <Text style={styles.unitText}>VNĐ/Lít</Text>
-                </View>
-                <View style={styles.verticalLine} />
-                <View style={styles.priceBlock}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={styles.zoneTitle}>VÙNG 2</Text>
-                        <Text style={styles.zoneDiff}>(+2%)</Text>
+        <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={onPress}
+            style={styles.card}
+        >
+            {/* --- Header Card: Logo & Tên --- */}
+            <View style={styles.cardTop}>
+                {logoUrl ? (
+                    <Image source={{ uri: logoUrl }} style={styles.logo} resizeMode="contain" />
+                ) : (
+                    <View style={styles.logoPlaceholder}>
+                        <Fuel size={24} color="#2c3e50" />
                     </View>
-                    <Text style={[styles.priceText, { color: '#c0392b' }]}>{formatCurrency(item.zone2_price)}</Text>
-                    <Text style={styles.unitText}>VNĐ/Lít</Text>
+                )}
+                <View style={styles.cardHeaderInfo}>
+                    <Text style={styles.itemTitle}>{item.title}</Text>
+                    <Text style={styles.tapHint}>(Chạm để xem lịch sử)</Text>
                 </View>
             </View>
-        </View>
+
+            <View style={styles.divider} />
+
+            {/* --- Body Card: Giá --- */}
+            <View style={styles.priceContainer}>
+                {isPvoil ? (
+                    <View style={[styles.priceBox, { alignItems: 'center' }]}>
+                        <Text style={styles.priceLabel}>GIÁ BÁN LẺ</Text>
+                        <Text style={styles.priceValue}>{formatCurrency(item.price)}</Text>
+                        <Text style={styles.currency}>VNĐ</Text>
+                    </View>
+                ) : (
+                    <>
+                        <View style={styles.priceBox}>
+                            <Text style={styles.priceLabel}>VÙNG 1</Text>
+                            <Text style={styles.priceValue}>{formatCurrency(item.zone1_price)}</Text>
+                            <Text style={styles.currency}>VNĐ</Text>
+                        </View>
+                        <View style={styles.verticalLine} />
+                        <View style={styles.priceBox}>
+                            <Text style={[styles.priceLabel, { color: '#c0392b' }]}>VÙNG 2</Text>
+                            <Text style={[styles.priceValue, { color: '#c0392b' }]}>{formatCurrency(item.zone2_price)}</Text>
+                            <Text style={styles.currency}>VNĐ</Text>
+                        </View>
+                    </>
+                )}
+            </View>
+        </TouchableOpacity>
     );
 };
 
 const styles = StyleSheet.create({
-    card: {
-        backgroundColor: '#FFF', borderRadius: 16, marginBottom: 16, padding: 16,
-        shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4
-    },
-    cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-    badge: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
-    badgeText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
-    itemName: { fontSize: 18, fontWeight: '700', color: '#2c3e50' },
-    itemDate: { fontSize: 12, color: '#95a5a6', marginTop: 2 },
-    divider: { height: 1, backgroundColor: '#f0f0f0', marginBottom: 12 },
-    priceRow: { flexDirection: 'row', justifyContent: 'space-between' },
-    priceBlock: { flex: 1, alignItems: 'center' },
-    verticalLine: { width: 1, backgroundColor: '#ecf0f1', marginHorizontal: 10 },
-    zoneTitle: { fontSize: 12, fontWeight: '700', color: '#7f8c8d', marginBottom: 4 },
-    zoneDiff: { fontSize: 10, color: '#c0392b', marginLeft: 4, fontWeight: 'bold' },
-    priceText: { fontSize: 20, fontWeight: 'bold' },
-    unitText: { fontSize: 10, color: '#95a5a6', marginTop: 2 },
+    card: { ...CARD_STYLES },
+
+    cardTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+    logo: { width: 40, height: 40, marginRight: 12 },
+    logoPlaceholder: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#ecf0f1', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+    cardHeaderInfo: { flex: 1 },
+    itemTitle: { fontSize: 16, fontWeight: '700', color: '#2c3e50' },
+    tapHint: { fontSize: 10, color: '#e67e22', fontStyle: 'italic', marginTop: 2 },
+
+    divider: { height: 1, backgroundColor: '#eee', marginBottom: 12 },
+
+    priceContainer: { flexDirection: 'row', justifyContent: 'space-between' },
+    priceBox: { flex: 1, alignItems: 'center' },
+    verticalLine: { width: 1, backgroundColor: '#eee', marginHorizontal: 10 },
+
+    priceLabel: { fontSize: 11, fontWeight: '600', color: '#7f8c8d', marginBottom: 4 },
+    priceValue: { fontSize: 20, fontWeight: 'bold', color: '#2c3e50' },
+    currency: { fontSize: 10, color: '#bdc3c7' }
 });

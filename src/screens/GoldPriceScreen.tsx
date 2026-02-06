@@ -1,12 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-    View, Text, FlatList, StyleSheet, ActivityIndicator,
-    TouchableOpacity, RefreshControl, StatusBar
-} from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, RefreshControl, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { parse } from 'node-html-parser';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Coins } from 'lucide-react-native';
+import { CARD_STYLES, getLogo } from '../utils/helpers';
 
 const GOLD_SOURCES = [
     { id: 'sjc', name: 'SJC', url: 'https://giavang.org/trong-nuoc/sjc/' },
@@ -17,7 +15,7 @@ const GOLD_SOURCES = [
 export default function GoldPriceScreen() {
     const [selectedSource, setSelectedSource] = useState(GOLD_SOURCES[0]);
     const [goldData, setGoldData] = useState<any[]>([]);
-    const [lastUpdated, setLastUpdated] = useState<string>(''); // State lưu thời gian
+    const [lastUpdated, setLastUpdated] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -33,17 +31,13 @@ export default function GoldPriceScreen() {
             const root = parse(html);
             const items: any[] = [];
 
-            // 1. LẤY THỜI GIAN CẬP NHẬT
-            // Tìm thẻ small nằm trong h1 (theo cấu trúc HTML bạn cung cấp)
             const timeNode = root.querySelector('h1.box-headline small');
             if (timeNode) {
-                // timeNode.text sẽ là "Cập nhật lúc 10:35:28 30/12/2025"
                 setLastUpdated(timeNode.text.trim());
             } else {
                 setLastUpdated('');
             }
 
-            // 2. LẤY DỮ LIỆU BẢNG GIÁ
             const mainBox = root.querySelector('.gold-price-box');
             if (mainBox) {
                 const titles = mainBox.querySelectorAll('h2');
@@ -82,118 +76,92 @@ export default function GoldPriceScreen() {
         fetchGoldPrice(selectedSource.url);
     }, [selectedSource]);
 
-    const renderItem = ({ item }: { item: any }) => (
-        <View style={styles.card}>
-            <View style={styles.cardHeader}>
-                <View style={styles.iconContainer}>
-                    <MaterialCommunityIcons name="ring" size={24} color="#f1c40f" />
-                </View>
-                <Text style={styles.cardTitle}>{item.title}</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.row}>
-                <View style={styles.priceCol}>
-                    <Text style={styles.label}>MUA VÀO</Text>
-                    <Text style={styles.buyPrice}>{item.buyPrice}</Text>
-                    <Text style={styles.unit}>k/lượng</Text>
-                </View>
-                <View style={styles.verticalLine} />
-                <View style={styles.priceCol}>
-                    <Text style={styles.label}>BÁN RA</Text>
-                    <Text style={styles.sellPrice}>{item.sellPrice}</Text>
-                    <Text style={styles.unit}>k/lượng</Text>
-                </View>
-            </View>
-        </View>
-    );
+    const renderItem = ({ item }: { item: any }) => {
+        const logoUrl = getLogo(selectedSource.name);
 
-    return (
-        <>
-            <StatusBar barStyle="light-content" backgroundColor="#2c3e50" />
-            <SafeAreaView style={{ flex: 0, backgroundColor: '#2c3e50' }} edges={['top']} />
-            <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+        return (
+            <View style={styles.card}>
+                <View style={styles.cardTop}>
+                    {logoUrl ? <Image source={{ uri: logoUrl }} style={styles.logo} resizeMode="contain" /> :
+                        <Coins size={32} color="#f1c40f" style={{ marginRight: 10 }} />}
+                    <Text style={styles.itemTitle}>{item.title}</Text>
+                </View>
 
-                <View style={styles.header}>
-                    <Text style={styles.headerTitle}>GIÁ VÀNG TRONG NƯỚC</Text>
-                    {/* HIỂN THỊ THỜI GIAN CẬP NHẬT */}
-                    {lastUpdated ? (
-                        <Text style={styles.lastUpdatedText}>{lastUpdated}</Text>
-                    ) : null}
+                <View style={styles.divider} />
 
-                    <View style={styles.sourceTabsContainer}>
-                        {GOLD_SOURCES.map((source) => (
-                            <TouchableOpacity
-                                key={source.id}
-                                style={[styles.tabButton, selectedSource.id === source.id && styles.activeTab]}
-                                onPress={() => setSelectedSource(source)}
-                            >
-                                <Text style={[styles.tabText, selectedSource.id === source.id && styles.activeTabText]}>
-                                    {source.name}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
+                <View style={styles.priceContainer}>
+                    <View style={styles.priceBox}>
+                        <Text style={styles.priceLabel}>MUA VÀO</Text>
+                        <Text style={[styles.priceValue, { color: '#27ae60' }]}>{item.buyPrice}</Text>
+                        <Text style={styles.currency}>k/lượng</Text>
+                    </View>
+                    <View style={styles.verticalLine} />
+                    <View style={styles.priceBox}>
+                        <Text style={styles.priceLabel}>BÁN RA</Text>
+                        <Text style={[styles.priceValue, { color: '#e74c3c' }]}>{item.sellPrice}</Text>
+                        <Text style={styles.currency}>k/lượng</Text>
                     </View>
                 </View>
+            </View>
+        );
+    };
 
-                <View style={styles.body}>
-                    {loading ? (
-                        <View style={styles.center}>
-                            <ActivityIndicator size="large" color="#e67e22" />
-                            <Text style={{ marginTop: 10, color: '#7f8c8d' }}>Đang cập nhật giá...</Text>
-                        </View>
-                    ) : (
-                        <FlatList
-                            data={goldData}
-                            keyExtractor={(item) => item.id}
-                            renderItem={renderItem}
-                            contentContainerStyle={styles.list}
-                            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#e67e22']} />}
-                            ListEmptyComponent={<Text style={styles.emptyText}>Không lấy được dữ liệu.</Text>}
-                            ListFooterComponent={<View style={{ height: 20 }} />}
-                        />
-                    )}
+    return (
+        <View style={styles.container}>
+            <SafeAreaView style={styles.headerContainer} edges={['top', 'left', 'right']}>
+                <View style={styles.headerContent}>
+                    <Text style={styles.headerTitle}>GIÁ VÀNG {selectedSource.name}</Text>
+                    {lastUpdated ? <Text style={styles.subHeader}>{lastUpdated}</Text> : null}
+                </View>
+                {/* Tabs Source */}
+                <View style={styles.tabsWrapper}>
+                    {GOLD_SOURCES.map((source) => (
+                        <TouchableOpacity
+                            key={source.id}
+                            style={[styles.tabItem, selectedSource.id === source.id && styles.activeTab]}
+                            onPress={() => setSelectedSource(source)}
+                        >
+                            <Text style={[styles.tabText, selectedSource.id === source.id && styles.activeTabText]}>{source.name}</Text>
+                        </TouchableOpacity>
+                    ))}
                 </View>
             </SafeAreaView>
-        </>
+
+            <View style={styles.body}>
+                {loading ? <ActivityIndicator size="large" color="#e67e22" style={{ marginTop: 50 }} /> :
+                    <FlatList data={goldData} renderItem={renderItem} contentContainerStyle={styles.list}
+                        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />} />
+                }
+            </View>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#ecf0f1' },
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: {
-        backgroundColor: '#2c3e50',
-        padding: 15, paddingBottom: 20, alignItems: 'center',
-        shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5, zIndex: 10
-    },
-    headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFF', marginBottom: 5, letterSpacing: 1 },
-    // Style cho dòng thời gian cập nhật
-    lastUpdatedText: { fontSize: 12, color: '#bdc3c7', marginBottom: 15, fontStyle: 'italic' },
+    container: { flex: 1, backgroundColor: '#F5F7FA' },
+    headerContainer: { backgroundColor: '#1e272e', paddingBottom: 10 },
+    headerContent: { alignItems: 'center', marginBottom: 10, paddingTop: 10 },
+    headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#FFF' },
+    subHeader: { fontSize: 11, color: '#bdc3c7', marginTop: 2, fontStyle: 'italic' },
 
-    sourceTabsContainer: {
-        flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 25, padding: 4,
-        width: '100%', justifyContent: 'space-between'
-    },
-    tabButton: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 20 },
-    activeTab: { backgroundColor: '#e67e22', shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, elevation: 2 },
+    tabsWrapper: { flexDirection: 'row', marginHorizontal: 16, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: 4 },
+    tabItem: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 6 },
+    activeTab: { backgroundColor: '#e67e22' },
     tabText: { color: '#bdc3c7', fontWeight: '600', fontSize: 13 },
-    activeTabText: { color: '#FFF', fontWeight: 'bold' },
+    activeTabText: { color: '#FFF' },
+
     body: { flex: 1 },
     list: { padding: 16 },
-    card: {
-        backgroundColor: '#FFF', borderRadius: 16, marginBottom: 16, padding: 16,
-        shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4
-    },
-    cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, justifyContent: 'center' },
-    iconContainer: { marginRight: 8 },
-    cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50' },
-    divider: { height: 1, backgroundColor: '#f0f0f0', marginBottom: 12 },
-    row: { flexDirection: 'row', justifyContent: 'space-between' },
-    priceCol: { flex: 1, alignItems: 'center' },
-    verticalLine: { width: 1, backgroundColor: '#ecf0f1', marginHorizontal: 10 },
-    label: { fontSize: 12, fontWeight: '700', color: '#7f8c8d', marginBottom: 4 },
-    buyPrice: { fontSize: 22, fontWeight: 'bold', color: '#27ae60' },
-    sellPrice: { fontSize: 22, fontWeight: 'bold', color: '#c0392b' },
-    unit: { fontSize: 11, color: '#95a5a6', marginTop: 2 },
-    emptyText: { textAlign: 'center', marginTop: 50, color: '#7f8c8d' }
+
+    card: { ...CARD_STYLES },
+    cardTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
+    logo: { width: 32, height: 32, marginRight: 10 },
+    itemTitle: { fontSize: 16, fontWeight: 'bold', color: '#2c3e50', flex: 1 },
+    divider: { height: 1, backgroundColor: '#eee', marginBottom: 12 },
+    priceContainer: { flexDirection: 'row', justifyContent: 'space-between' },
+    priceBox: { flex: 1, alignItems: 'center' },
+    verticalLine: { width: 1, backgroundColor: '#eee', marginHorizontal: 10 },
+    priceLabel: { fontSize: 11, fontWeight: '700', color: '#95a5a6', marginBottom: 4 },
+    priceValue: { fontSize: 20, fontWeight: 'bold' },
+    currency: { fontSize: 10, color: '#bdc3c7' }
 });
