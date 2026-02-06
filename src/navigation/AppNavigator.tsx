@@ -1,8 +1,8 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-
+import { Fuel, Coins, Banknote } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import HomeScreen from '../screens/HomeScreen';
 import GoldPriceScreen from '../screens/GoldPriceScreen';
 import ExchangeRateScreen from '../screens/ExchangeRateScreen';
@@ -16,6 +16,9 @@ export type MainTabParamList = {
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export default function AppNavigator() {
+    const insets = useSafeAreaInsets();
+    const paddingBottom = insets.bottom > 0 ? insets.bottom : 15;
+
     return (
         <NavigationContainer>
             <Tab.Navigator
@@ -29,10 +32,14 @@ export default function AppNavigator() {
                         backgroundColor: '#fff',
                         borderTopWidth: 1,
                         borderTopColor: '#f1f2f6',
-                        height: 60,
-                        paddingBottom: 8,
+                        height: 65 + paddingBottom,
+                        paddingBottom: paddingBottom,
                         paddingTop: 8,
-                        elevation: 10,
+                        elevation: 20,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: -2 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 4,
                     },
                     tabBarLabelStyle: {
                         fontSize: 12,
@@ -46,8 +53,8 @@ export default function AppNavigator() {
                     component={HomeScreen}
                     options={{
                         tabBarLabel: 'Giá Xăng',
-                        tabBarIcon: ({ color }) => (
-                            <MaterialCommunityIcons name="gas-station" size={26} color={color} />
+                        tabBarIcon: ({ color, size }) => (
+                            <Fuel size={size} color={color} strokeWidth={2} />
                         )
                     }}
                 />
@@ -56,8 +63,8 @@ export default function AppNavigator() {
                     component={GoldPriceScreen}
                     options={{
                         tabBarLabel: 'Giá Vàng',
-                        tabBarIcon: ({ color }) => (
-                            <MaterialCommunityIcons name="gold" size={26} color={color} />
+                        tabBarIcon: ({ color, size }) => (
+                            <Coins size={size} color={color} strokeWidth={2} />
                         )
                     }}
                 />
@@ -66,8 +73,8 @@ export default function AppNavigator() {
                     component={ExchangeRateScreen}
                     options={{
                         tabBarLabel: 'Tỷ Giá',
-                        tabBarIcon: ({ color }) => (
-                            <MaterialCommunityIcons name="currency-usd" size={26} color={color} />
+                        tabBarIcon: ({ color, size }) => (
+                            <Banknote size={size} color={color} strokeWidth={2} />
                         )
                     }}
                 />

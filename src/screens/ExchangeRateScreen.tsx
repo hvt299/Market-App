@@ -1,14 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-    View, Text, FlatList, StyleSheet, ActivityIndicator,
-    TouchableOpacity, RefreshControl, StatusBar, ScrollView
-} from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, RefreshControl, Image, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { parse } from 'node-html-parser';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Banknote } from 'lucide-react-native';
+import { CARD_STYLES, getLogo } from '../utils/helpers';
 
-// Danh sách nguồn dữ liệu (Ngân hàng)
 const EXCHANGE_SOURCES = [
     { id: 'vcb', name: 'Vietcombank', url: 'https://baomoi.com/tien-ich-ty-gia-ngoai-te-vietcombank.epi' },
     { id: 'bidv', name: 'BIDV', url: 'https://baomoi.com/tien-ich-ty-gia-ngoai-te-bidv.epi' },
@@ -36,12 +33,8 @@ export default function ExchangeRateScreen() {
             const html = response.data;
             const root = parse(html);
 
-            // 1. LẤY THỜI GIAN CẬP NHẬT
-            // Tìm thẻ h2 chứa thông tin ngày giờ
             const titleNode = root.querySelector('h2.ut-title');
             if (titleNode) {
-                // Lấy nội dung text và xử lý để chỉ lấy phần ngày giờ
-                // Ví dụ text gốc: "Tỷ giá ... Ngày 30-12-2025 10:51"
                 const fullText = titleNode.text.trim();
                 const dateMatch = fullText.match(/Ngày\s+(.*)/);
                 if (dateMatch) {
@@ -51,23 +44,14 @@ export default function ExchangeRateScreen() {
                 }
             }
 
-            // 2. LẤY BẢNG TỶ GIÁ
             const items: any[] = [];
             const rows = root.querySelectorAll('.rc-table-row');
 
             rows.forEach((row, index) => {
                 const cells = row.querySelectorAll('td');
-                // Cấu trúc cột theo HTML bạn cung cấp:
-                // 0: Icon (bỏ qua)
-                // 1: Mã NT (AUD, USD...)
-                // 2: Mua tiền mặt
-                // 3: Mua chuyển khoản
-                // 4: Bán tiền mặt
-                // 5: Bán chuyển khoản
 
                 if (cells.length >= 6) {
-                    // Lấy Mã Tiền Tệ (ví dụ: AUD) - nằm trong thẻ div hoặc text trực tiếp
-                    const code = cells[1].text.trim().split(' ')[0]; // Lấy chữ cái đầu tiên (AUD) bỏ phần tên dài
+                    const code = cells[1].text.trim().split(' ')[0];
                     const name = cells[1].querySelector('div.truncate')?.text.trim() || '';
 
                     const buyCash = cells[2].text.trim();
@@ -103,153 +87,96 @@ export default function ExchangeRateScreen() {
         fetchExchangeRates(selectedBank.url);
     }, [selectedBank]);
 
-    const renderItem = ({ item }: { item: any }) => (
-        <View style={styles.card}>
-            {/* Header Card: Mã tiền tệ & Tên */}
-            <View style={styles.cardHeader}>
-                <View style={styles.flagContainer}>
-                    {/* Dùng icon tiền tệ chung hoặc text tròn */}
-                    <View style={styles.currencyAvatar}>
-                        <Text style={styles.currencyText}>{item.code[0]}</Text>
-                    </View>
-                </View>
-                <View>
-                    <Text style={styles.currencyCode}>{item.code}</Text>
-                    <Text style={styles.currencyName}>{item.name}</Text>
-                </View>
-            </View>
+    const renderItem = ({ item }: { item: any }) => {
+        const countryCode = item.code.substring(0, 2);
+        const flagUrl = `https://flagsapi.com/${countryCode}/flat/64.png`;
 
-            <View style={styles.divider} />
-
-            {/* Grid Giá: Mua / Bán */}
-            <View style={styles.rateContainer}>
-                {/* Cột MUA */}
-                <View style={styles.rateColumn}>
-                    <Text style={styles.colLabel}>MUA VÀO (VNĐ)</Text>
-                    <View style={styles.rateRow}>
-                        <Text style={styles.rateType}>TM:</Text>
-                        <Text style={styles.rateValue}>{item.buyCash}</Text>
-                    </View>
-                    <View style={styles.rateRow}>
-                        <Text style={styles.rateType}>CK:</Text>
-                        <Text style={styles.rateValue}>{item.buyTransfer}</Text>
+        return (
+            <View style={styles.card}>
+                <View style={styles.cardTop}>
+                    {flagUrl ? <Image source={{ uri: flagUrl }} style={styles.flag} resizeMode="contain" /> :
+                        <Banknote size={32} color="#27ae60" style={{ marginRight: 10 }} />}
+                    <View>
+                        <Text style={styles.currencyCode}>{item.code}</Text>
+                        <Text style={styles.currencyName}>{item.name}</Text>
                     </View>
                 </View>
 
-                <View style={styles.verticalLine} />
+                <View style={styles.divider} />
 
-                {/* Cột BÁN */}
-                <View style={styles.rateColumn}>
-                    <Text style={styles.colLabel}>BÁN RA (VNĐ)</Text>
-                    <View style={styles.rateRow}>
-                        <Text style={styles.rateType}>TM:</Text>
-                        <Text style={styles.rateValue}>{item.sellCash}</Text>
+                <View style={styles.priceContainer}>
+                    {/* MUA */}
+                    <View style={styles.priceCol}>
+                        <Text style={styles.headLabel}>MUA (TM)</Text>
+                        <Text style={[styles.priceVal, { color: '#27ae60' }]}>{item.buyCash}</Text>
                     </View>
-                    <View style={styles.rateRow}>
-                        <Text style={styles.rateType}>CK:</Text>
-                        <Text style={styles.rateValue}>{item.sellTransfer}</Text>
+                    {/* BÁN */}
+                    <View style={styles.priceCol}>
+                        <Text style={styles.headLabel}>BÁN (TM)</Text>
+                        <Text style={[styles.priceVal, { color: '#e74c3c' }]}>{item.sellCash}</Text>
                     </View>
                 </View>
             </View>
-        </View>
-    );
+        );
+    };
 
     return (
-        <>
-            <StatusBar barStyle="light-content" backgroundColor="#2c3e50" />
-            <SafeAreaView style={{ flex: 0, backgroundColor: '#2c3e50' }} edges={['top']} />
-            <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
-
-                <View style={styles.header}>
+        <View style={styles.container}>
+            <SafeAreaView style={styles.headerContainer} edges={['top', 'left', 'right']}>
+                <View style={styles.headerContent}>
                     <Text style={styles.headerTitle}>TỶ GIÁ NGOẠI TỆ</Text>
-                    {lastUpdated ? <Text style={styles.lastUpdated}>Cập nhật: {lastUpdated}</Text> : null}
-
-                    {/* ScrollView Ngang cho danh sách Ngân hàng */}
-                    <View style={styles.bankListContainer}>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 5 }}>
-                            {EXCHANGE_SOURCES.map((bank) => (
-                                <TouchableOpacity
-                                    key={bank.id}
-                                    style={[styles.bankButton, selectedBank.id === bank.id && styles.activeBank]}
-                                    onPress={() => setSelectedBank(bank)}
-                                >
-                                    <Text style={[styles.bankText, selectedBank.id === bank.id && styles.activeBankText]}>
-                                        {bank.name}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                    </View>
                 </View>
-
-                <View style={styles.body}>
-                    {loading ? (
-                        <View style={styles.center}>
-                            <ActivityIndicator size="large" color="#3498db" />
-                            <Text style={{ marginTop: 10, color: '#7f8c8d' }}>Đang tải dữ liệu...</Text>
-                        </View>
-                    ) : (
-                        <FlatList
-                            data={rates}
-                            keyExtractor={(item) => item.id}
-                            renderItem={renderItem}
-                            contentContainerStyle={styles.list}
-                            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3498db']} />}
-                            ListEmptyComponent={<Text style={styles.emptyText}>Không có dữ liệu.</Text>}
-                            ListFooterComponent={<View style={{ height: 20 }} />}
-                        />
-                    )}
+                <View style={{ height: 50 }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 10 }}>
+                        {EXCHANGE_SOURCES.map((bank) => (
+                            <TouchableOpacity
+                                key={bank.id}
+                                style={[styles.bankChip, selectedBank.id === bank.id && styles.activeChip]}
+                                onPress={() => setSelectedBank(bank)}
+                            >
+                                {/* Có thể thêm logo ngân hàng nhỏ vào đây */}
+                                <Text style={[styles.chipText, selectedBank.id === bank.id && styles.activeChipText]}>{bank.name}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
                 </View>
             </SafeAreaView>
-        </>
+
+            <View style={styles.body}>
+                {loading ? <ActivityIndicator size="large" color="#1e272e" style={{ marginTop: 50 }} /> :
+                    <FlatList
+                        data={rates}
+                        renderItem={renderItem}
+                        contentContainerStyle={styles.list}
+                        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                    />
+                }
+            </View>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#ecf0f1' },
-    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: {
-        backgroundColor: '#2c3e50',
-        paddingVertical: 15, alignItems: 'center',
-        shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5, zIndex: 10
-    },
-    headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFF', letterSpacing: 1 },
-    lastUpdated: { fontSize: 12, color: '#bdc3c7', marginTop: 4, fontStyle: 'italic' },
+    container: { flex: 1, backgroundColor: '#F5F7FA' },
+    headerContainer: { backgroundColor: '#1e272e', paddingBottom: 10 },
+    headerContent: { alignItems: 'center', marginBottom: 15, paddingTop: 10 },
+    headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#FFF' },
 
-    bankListContainer: { marginTop: 15, height: 40 },
-    bankButton: {
-        paddingHorizontal: 16, paddingVertical: 8, marginHorizontal: 4,
-        borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center'
-    },
-    activeBank: { backgroundColor: '#3498db' },
-    bankText: { color: '#bdc3c7', fontWeight: '600' },
-    activeBankText: { color: '#FFF', fontWeight: 'bold' },
+    bankChip: { backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8, justifyContent: 'center' },
+    activeChip: { backgroundColor: '#e67e22' },
+    chipText: { color: '#bdc3c7', fontWeight: '600' },
+    activeChipText: { color: '#FFF' },
 
     body: { flex: 1 },
     list: { padding: 16 },
-
-    // Card Styles
-    card: {
-        backgroundColor: '#FFF', borderRadius: 16, marginBottom: 12, padding: 12,
-        shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3
-    },
-    cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-    flagContainer: { marginRight: 10 },
-    currencyAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#ecf0f1', justifyContent: 'center', alignItems: 'center' },
-    currencyText: { fontSize: 18, fontWeight: 'bold', color: '#34495e' },
+    card: { ...CARD_STYLES },
+    cardTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+    flag: { width: 36, height: 36, marginRight: 12, borderRadius: 18, backgroundColor: '#f0f0f0' },
     currencyCode: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50' },
-    currencyName: { fontSize: 12, color: '#7f8c8d' },
-
-    divider: { height: 1, backgroundColor: '#f0f0f0', marginBottom: 10 },
-
-    rateContainer: { flexDirection: 'row' },
-    rateColumn: { flex: 1 },
-    colLabel: { fontSize: 11, fontWeight: '700', color: '#95a5a6', marginBottom: 6, textAlign: 'center' },
-    verticalLine: { width: 1, backgroundColor: '#f0f0f0', marginHorizontal: 8 },
-
-    rateRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4, paddingHorizontal: 4 },
-    rateType: { fontSize: 12, color: '#7f8c8d' },
-    rateValue: { fontSize: 13, fontWeight: 'bold', color: '#2c3e50' },
-
-    emptyText: { textAlign: 'center', marginTop: 50, color: '#7f8c8d' }
+    currencyName: { fontSize: 12, color: '#95a5a6' },
+    divider: { height: 1, backgroundColor: '#eee', marginBottom: 10 },
+    priceContainer: { flexDirection: 'row', justifyContent: 'space-between' },
+    priceCol: { flex: 1, alignItems: 'center' },
+    headLabel: { fontSize: 11, fontWeight: '700', color: '#95a5a6' },
+    priceVal: { fontSize: 18, fontWeight: 'bold', marginTop: 4 },
 });
