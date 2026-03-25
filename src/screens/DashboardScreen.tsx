@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
+import axios from 'axios';
 import { useTheme } from '../theme/ThemeContext';
-import { Droplet, Coins, Banknote, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { Droplet, Coins, Banknote, ChevronRight, TrendingUp, TrendingDown, Minus } from 'lucide-react-native';
+import { getPreviousDay, formatCurrency } from '../utils/helpers';
 
 export default function DashboardScreen({ navigation }: any) {
     const { colors, isDarkMode } = useTheme();
@@ -17,11 +19,60 @@ export default function DashboardScreen({ navigation }: any) {
     const [goldIndex, setGoldIndex] = useState(0);
     const fadeAnim = useRef(new Animated.Value(1)).current;
 
+    const [gasList, setGasList] = useState<any[]>([]);
+    const [loadingGas, setLoadingGas] = useState(true);
+
     const goldSources = [
         { name: 'SJC', sub: 'Hồ Chí Minh', sell: '80.500', buy: '78.500' },
         { name: 'DOJI', sub: 'Hà Nội', sell: '80.500', buy: '78.500' },
         { name: 'PNJ', sub: 'Hồ Chí Minh', sell: '80.400', buy: '78.400' }
     ];
+
+    useEffect(() => {
+        const fetchDashboardGas = async () => {
+            try {
+                let targetDate = new Date().toISOString().substring(0, 10);
+                let response = await axios.get(`https://giaxanghomnay.com/api/pvdate/${targetDate}`);
+
+                if (!Array.isArray(response.data) || response.data.length < 2) {
+                    targetDate = getPreviousDay(targetDate);
+                    response = await axios.get(`https://giaxanghomnay.com/api/pvdate/${targetDate}`);
+                }
+
+                const todayData = response.data[0] || [];
+                const yesterdayData = response.data[2] || [];
+
+                const targetKeywords = ['RON 95-V', 'RON 95-III', 'E5 RON 92-II', 'E10 RON 95-III'];
+                const widgetColors = ['#e74c3c', '#e67e22', '#27AE60', '#f39c12'];
+
+                const processed = targetKeywords.map((keyword, index) => {
+                    const todayItem = todayData.find((item: any) => item.title.includes(keyword));
+                    if (!todayItem) return null;
+
+                    const yesterdayItem = yesterdayData.find((item: any) => item.title === todayItem.title);
+                    const change = yesterdayItem ? todayItem.zone1_price - yesterdayItem.zone1_price : 0;
+
+                    return {
+                        rawItem: todayItem,
+                        title: todayItem.title.replace(/^Xăng\s+/i, ''),
+                        price1: formatCurrency(todayItem.zone1_price),
+                        price2: formatCurrency(todayItem.zone2_price),
+                        trendValue: change,
+                        trendStr: change > 0 ? `+${change}` : change < 0 ? `${change}` : '0',
+                        color: widgetColors[index],
+                    };
+                }).filter(Boolean);
+
+                setGasList(processed);
+            } catch (error) {
+                console.log("Lỗi fetch xăng Dashboard:", error);
+            } finally {
+                setLoadingGas(false);
+            }
+        };
+
+        fetchDashboardGas();
+    }, []);
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -44,46 +95,60 @@ export default function DashboardScreen({ navigation }: any) {
         return () => clearInterval(interval);
     }, []);
 
-    const GasWidget = ({ title, price1, price2, trend, isUp, color }: any) => (
-        <View style={[styles.gasCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05 }]}>
-            <View style={styles.gasCardHeader}>
-                <View style={[styles.iconBoxMini, { backgroundColor: `${color}15` }]}>
-                    <Droplet size={18} color={color} strokeWidth={2.5} />
-                </View>
-                {isUp ? <TrendingUp size={16} color={colors.upColor} /> : <TrendingDown size={16} color={colors.downColor} />}
-            </View>
+    const GasWidget = ({ data }: any) => {
+        const { title, price1, price2, trendValue, trendStr, color, rawItem } = data;
+        const isUp = trendValue > 0;
+        const isDown = trendValue < 0;
 
-            <View style={styles.gasCardBody}>
-                <Text style={[styles.gasTitle, { color: colors.textSecondary }]}>{title}</Text>
-
-                <Animated.View style={{ opacity: fadeAnim }}>
-                    <View style={styles.priceRow}>
-                        <Text style={[styles.gasPrice, { color: colors.textPrimary }]}>
-                            {isZone1 ? price1 : price2} <Text style={styles.unit}>đ</Text>
-                        </Text>
-
-                        {!isZone1 && (
-                            <View style={[styles.zoneBadge, { backgroundColor: '#e74c3c20', marginLeft: 6 }]}>
-                                <Text style={[styles.zoneText, { color: colors.upColor }]}>+2%</Text>
-                            </View>
-                        )}
+        return (
+            <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate('GasDetail', { gasItem: rawItem, provider: 'Petrolimex' })}
+                style={[styles.gasCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05 }]}
+            >
+                <View style={styles.gasCardHeader}>
+                    <View style={[styles.iconBoxMini, { backgroundColor: `${color}15` }]}>
+                        <Droplet size={18} color={color} strokeWidth={2.5} />
                     </View>
+                    {isUp ? <TrendingUp size={16} color={colors.upColor} /> :
+                        isDown ? <TrendingDown size={16} color={colors.downColor} /> :
+                            <Minus size={16} color={colors.textSecondary} />}
+                </View>
 
-                    <View style={styles.trendRow}>
-                        <View style={[styles.zoneBadge, { backgroundColor: colors.border }]}>
-                            <Text style={[styles.zoneText, { color: colors.textSecondary }]}>
-                                {isZone1 ? 'VÙNG 1' : 'VÙNG 2'}
+                <View style={styles.gasCardBody}>
+                    <Text style={[styles.gasTitle, { color: colors.textSecondary }]} numberOfLines={1}>{title}</Text>
+
+                    <Animated.View style={{ opacity: fadeAnim }}>
+                        <View style={styles.priceRow}>
+                            <Text style={[styles.gasPrice, { color: colors.textPrimary }]}>
+                                {isZone1 ? price1 : price2} <Text style={styles.unit}>đ</Text>
                             </Text>
+
+                            {!isZone1 && (
+                                <View style={[styles.zoneBadge, { backgroundColor: '#e74c3c20', marginLeft: 6 }]}>
+                                    <Text style={[styles.zoneText, { color: colors.upColor }]}>+2%</Text>
+                                </View>
+                            )}
                         </View>
 
-                        <Text style={[styles.gasTrend, { color: isUp ? colors.upColor : colors.downColor }]}>
-                            {trend}
-                        </Text>
-                    </View>
-                </Animated.View>
-            </View>
-        </View>
-    );
+                        <View style={styles.trendRow}>
+                            <View style={[styles.zoneBadge, { backgroundColor: colors.border }]}>
+                                <Text style={[styles.zoneText, { color: colors.textSecondary }]}>
+                                    {isZone1 ? 'VÙNG 1' : 'VÙNG 2'}
+                                </Text>
+                            </View>
+
+                            {trendValue !== 0 && (
+                                <Text style={[styles.gasTrend, { color: isUp ? colors.upColor : colors.downColor }]}>
+                                    {trendStr} đ
+                                </Text>
+                            )}
+                        </View>
+                    </Animated.View>
+                </View>
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -102,12 +167,15 @@ export default function DashboardScreen({ navigation }: any) {
                         </TouchableOpacity>
                     </View>
 
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
-                        <GasWidget title="RON 95-III" price1="23.500" price2="23.970" trend="+200" isUp={true} color="#e67e22" />
-                        <GasWidget title="E5 RON 92-II" price1="22.400" price2="22.840" trend="-150" isUp={false} color="#27AE60" />
-                        <GasWidget title="RON 95-V" price1="24.000" price2="24.480" trend="+250" isUp={true} color="#e74c3c" />
-                        <GasWidget title="E10 RON 95" price1="23.800" price2="24.270" trend="+100" isUp={true} color="#f39c12" />
-                    </ScrollView>
+                    {loadingGas ? (
+                        <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} />
+                    ) : (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+                            {gasList.map((gas, index) => (
+                                <GasWidget key={index} data={gas} />
+                            ))}
+                        </ScrollView>
+                    )}
                 </View>
 
                 {/* --- KHỐI GIÁ VÀNG --- */}
@@ -152,7 +220,7 @@ export default function DashboardScreen({ navigation }: any) {
                 {/* --- KHỐI TỶ GIÁ --- */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Tỷ giá (NHNN)</Text>
+                        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Ngoại tệ (NHNN)</Text>
                         <TouchableOpacity onPress={() => navigation.navigate('Exchange')} style={styles.seeAllBtn}>
                             <Text style={[styles.seeAllText, { color: colors.primary }]}>Chi tiết</Text>
                             <ChevronRight size={16} color={colors.primary} />
@@ -287,7 +355,7 @@ const styles = StyleSheet.create({
     gasCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
     iconBoxMini: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
     gasCardBody: { gap: 4 },
-    gasTitle: { fontSize: 13, fontWeight: '600' },
+    gasTitle: { fontSize: 13, fontWeight: '700', marginBottom: 2 },
     priceRow: { flexDirection: 'row', alignItems: 'center' },
     gasPrice: { fontSize: 18, fontWeight: '900', letterSpacing: -0.5 },
 

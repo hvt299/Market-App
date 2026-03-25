@@ -70,7 +70,6 @@ export default function GasDetailScreen({ route, navigation }: any) {
         while (history.length < MAX_HISTORY && attempts < MAX_ATTEMPTS) {
             let prevDate = getPreviousDay(searchDate);
             try {
-                // Đã fix lỗi chuỗi URL và XÓA HOÀN TOÀN HÀM DELAY SETTIMEOUT
                 const response = await axios.get(`https://giaxanghomnay.com/api/pvdate/${prevDate}`);
                 let prevData = isPetrolimex ? (response.data[0] || []) : (response.data[1] || []);
                 let prevItem = prevData.find((y: any) => y.title === gasItem.title);
@@ -94,9 +93,7 @@ export default function GasDetailScreen({ route, navigation }: any) {
                         effectiveDate = prevDate;
                     }
                 }
-            } catch (error) {
-                // Bỏ qua lỗi 404/500
-            }
+            } catch (error) {}
             await new Promise(resolve => setTimeout(resolve, 100));
             searchDate = prevDate;
             attempts++;
@@ -167,13 +164,11 @@ export default function GasDetailScreen({ route, navigation }: any) {
                             const isLatest = index === chartData.length - 1;
                             const val = animatedValues[index] || new Animated.Value(0);
 
-                            // Chiều cao Vùng 1 (Max 100px)
                             const zone1Height = val.interpolate({
                                 inputRange: [0, 1],
                                 outputRange: [0, 100]
                             });
 
-                            // FIX CỘT ZONE 2 KHÔNG RÕ: Ép luôn cao hơn Vùng 1 đúng 6px (Visual Offset)
                             const zone2Height = isPetrolimex ? val.interpolate({
                                 inputRange: [0, 1],
                                 outputRange: [6, 106]
@@ -402,7 +397,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'flex-end',
         height: 140,
-        gap: 16, // Thêm khoảng cách đều giữa các cụm cột
+        gap: 16,
         paddingHorizontal: 10
     },
     barCol: {

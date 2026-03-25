@@ -17,7 +17,6 @@ export const GasItemCard: React.FC<GasItemCardProps> = ({ item, providerId, onPr
     const isPvoil = providerId.toLowerCase() === 'pvoil';
     const displayTitle = item.title.replace(/^Xăng\s+/i, '');
 
-    // Hàm render Badge Tăng/Giảm có hỗ trợ size nhỏ cho Vùng 2
     const renderTrendBadge = (change: number, isSmall = false) => {
         if (change === undefined || change === 0) return null;
 
@@ -25,7 +24,6 @@ export const GasItemCard: React.FC<GasItemCardProps> = ({ item, providerId, onPr
         const color = isUp ? colors.upColor : colors.downColor;
         const Icon = isUp ? TrendingUp : TrendingDown;
 
-        // Setup kích thước dựa trên cờ isSmall
         const iconSize = isSmall ? 12 : 14;
         const fontSize = isSmall ? 11 : 13;
         const padV = isSmall ? 2 : 4;
