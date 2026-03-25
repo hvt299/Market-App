@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Fuel } from 'lucide-react-native';
-import { formatCurrency, getLogo, CARD_STYLES } from '../utils/helpers';
+import { Fuel, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { formatCurrency, getLogo } from '../utils/helpers';
+import { useTheme } from '../theme/ThemeContext';
 
 interface GasItemCardProps {
     item: any;
@@ -10,52 +11,75 @@ interface GasItemCardProps {
 }
 
 export const GasItemCard: React.FC<GasItemCardProps> = ({ item, providerId, onPress }) => {
+    const { colors, isDarkMode } = useTheme();
     const logoUrl = getLogo(providerId);
-    const isPvoil = providerId === 'Pvoil';
+    const isPvoil = providerId.toLowerCase() === 'pvoil';
+    const displayTitle = item.title.replace(/^Xăng\s+/i, '');
+
+    const renderTrendBadge = (change: number) => {
+        if (!change || change === 0) return null;
+
+        const isUp = change > 0;
+        const color = isUp ? colors.upColor : colors.downColor;
+        const Icon = isUp ? TrendingUp : TrendingDown;
+
+        return (
+            <View style={[styles.trendBadge, { backgroundColor: `${color}15` }]}>
+                <Icon size={12} color={color} />
+                <Text style={[styles.trendText, { color }]}>{Math.abs(change)}</Text>
+            </View>
+        );
+    };
 
     return (
         <TouchableOpacity
             activeOpacity={0.7}
             onPress={onPress}
-            style={styles.card}
+            style={[
+                styles.card,
+                {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    shadowOpacity: isDarkMode ? 0 : 0.05
+                }
+            ]}
         >
-            {/* --- Header Card: Logo & Tên --- */}
-            <View style={styles.cardTop}>
+            <View style={styles.leftContent}>
                 {logoUrl ? (
                     <Image source={{ uri: logoUrl }} style={styles.logo} resizeMode="contain" />
                 ) : (
-                    <View style={styles.logoPlaceholder}>
-                        <Fuel size={24} color="#2c3e50" />
+                    <View style={[styles.logoPlaceholder, { backgroundColor: colors.border }]}>
+                        <Fuel size={20} color={colors.textPrimary} />
                     </View>
                 )}
-                <View style={styles.cardHeaderInfo}>
-                    <Text style={styles.itemTitle}>{item.title}</Text>
-                    <Text style={styles.tapHint}>(Chạm để xem lịch sử)</Text>
-                </View>
+                <Text style={[styles.itemName, { color: colors.textPrimary }]} numberOfLines={2}>
+                    {displayTitle}
+                </Text>
             </View>
 
-            <View style={styles.divider} />
+            <View style={[styles.verticalDivider, { backgroundColor: colors.border }]} />
 
-            {/* --- Body Card: Giá --- */}
-            <View style={styles.priceContainer}>
+            <View style={styles.rightContent}>
                 {isPvoil ? (
-                    <View style={[styles.priceBox, { alignItems: 'center' }]}>
-                        <Text style={styles.priceLabel}>GIÁ BÁN LẺ</Text>
-                        <Text style={styles.priceValue}>{formatCurrency(item.price)}</Text>
-                        <Text style={styles.currency}>VNĐ</Text>
+                    <View style={styles.priceRow}>
+                        {renderTrendBadge(item.change1)}
+                        <Text style={[styles.priceText, { color: colors.textPrimary }]}>
+                            {formatCurrency(item.price)} <Text style={styles.unit}>đ</Text>
+                        </Text>
                     </View>
                 ) : (
                     <>
-                        <View style={styles.priceBox}>
-                            <Text style={styles.priceLabel}>VÙNG 1</Text>
-                            <Text style={styles.priceValue}>{formatCurrency(item.zone1_price)}</Text>
-                            <Text style={styles.currency}>VNĐ</Text>
+                        <View style={styles.priceRow}>
+                            {renderTrendBadge(item.change1)}
+                            <Text style={[styles.priceText, { color: colors.textPrimary }]}>
+                                {formatCurrency(item.zone1_price)} <Text style={styles.unit}>đ</Text>
+                            </Text>
                         </View>
-                        <View style={styles.verticalLine} />
-                        <View style={styles.priceBox}>
-                            <Text style={[styles.priceLabel, { color: '#c0392b' }]}>VÙNG 2</Text>
-                            <Text style={[styles.priceValue, { color: '#c0392b' }]}>{formatCurrency(item.zone2_price)}</Text>
-                            <Text style={styles.currency}>VNĐ</Text>
+                        <View style={[styles.priceRow, { marginTop: 6 }]}>
+                            {renderTrendBadge(item.change2)}
+                            <Text style={[styles.priceTextSub, { color: colors.textSecondary }]}>
+                                {formatCurrency(item.zone2_price)} <Text style={styles.unit}>đ</Text>
+                            </Text>
                         </View>
                     </>
                 )}
@@ -65,22 +89,17 @@ export const GasItemCard: React.FC<GasItemCardProps> = ({ item, providerId, onPr
 };
 
 const styles = StyleSheet.create({
-    card: { ...CARD_STYLES },
-
-    cardTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-    logo: { width: 40, height: 40, marginRight: 12 },
-    logoPlaceholder: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#ecf0f1', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-    cardHeaderInfo: { flex: 1 },
-    itemTitle: { fontSize: 16, fontWeight: '700', color: '#2c3e50' },
-    tapHint: { fontSize: 10, color: '#e67e22', fontStyle: 'italic', marginTop: 2 },
-
-    divider: { height: 1, backgroundColor: '#eee', marginBottom: 12 },
-
-    priceContainer: { flexDirection: 'row', justifyContent: 'space-between' },
-    priceBox: { flex: 1, alignItems: 'center' },
-    verticalLine: { width: 1, backgroundColor: '#eee', marginHorizontal: 10 },
-
-    priceLabel: { fontSize: 11, fontWeight: '600', color: '#7f8c8d', marginBottom: 4 },
-    priceValue: { fontSize: 20, fontWeight: 'bold', color: '#2c3e50' },
-    currency: { fontSize: 10, color: '#bdc3c7' }
+    card: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 20, borderWidth: 1, marginBottom: 12, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowRadius: 8 },
+    leftContent: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+    logo: { width: 36, height: 36, marginRight: 12 },
+    logoPlaceholder: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+    itemName: { fontSize: 16, fontWeight: '700', flex: 1, lineHeight: 22 },
+    verticalDivider: { width: 1, height: '80%', marginHorizontal: 16 },
+    rightContent: { alignItems: 'flex-end', justifyContent: 'center', minWidth: 85 },
+    priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
+    priceText: { fontSize: 17, fontWeight: '800', letterSpacing: -0.5 },
+    priceTextSub: { fontSize: 15, fontWeight: '600', letterSpacing: -0.5 },
+    unit: { fontSize: 12, fontWeight: '600' },
+    trendBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 6 },
+    trendText: { fontSize: 11, fontWeight: '700', marginLeft: 2 }
 });

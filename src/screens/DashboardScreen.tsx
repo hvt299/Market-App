@@ -62,7 +62,6 @@ export default function DashboardScreen({ navigation }: any) {
                             {isZone1 ? price1 : price2} <Text style={styles.unit}>đ</Text>
                         </Text>
 
-                        {/* ĐÃ DỜI BADGE +2% LÊN ĐÂY NẰM CẠNH GIÁ */}
                         {!isZone1 && (
                             <View style={[styles.zoneBadge, { backgroundColor: '#e74c3c20', marginLeft: 6 }]}>
                                 <Text style={[styles.zoneText, { color: colors.upColor }]}>+2%</Text>
@@ -71,7 +70,6 @@ export default function DashboardScreen({ navigation }: any) {
                     </View>
 
                     <View style={styles.trendRow}>
-                        {/* Chỉ giữ lại chữ VÙNG 1 / VÙNG 2 ở dưới */}
                         <View style={[styles.zoneBadge, { backgroundColor: colors.border }]}>
                             <Text style={[styles.zoneText, { color: colors.textSecondary }]}>
                                 {isZone1 ? 'VÙNG 1' : 'VÙNG 2'}
@@ -90,8 +88,6 @@ export default function DashboardScreen({ navigation }: any) {
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
 
-            {/* --- SCROLL NỘI DUNG NẰM BÊN DƯỚI --- */}
-            {/* Đẩy nội dung xuống 1 đoạn bằng chiều cao Header (tai thỏ + 80) để không bị che mất lúc mới mở app */}
             <ScrollView
                 contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 115 }]}
                 showsVerticalScrollIndicator={false}
@@ -99,7 +95,7 @@ export default function DashboardScreen({ navigation }: any) {
                 {/* --- KHỐI XĂNG DẦU --- */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Xăng dầu</Text>
+                        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Xăng dầu (Petrolimex)</Text>
                         <TouchableOpacity onPress={() => navigation.navigate('Gas')} style={styles.seeAllBtn}>
                             <Text style={[styles.seeAllText, { color: colors.primary }]}>Chi tiết</Text>
                             <ChevronRight size={16} color={colors.primary} />
@@ -115,7 +111,7 @@ export default function DashboardScreen({ navigation }: any) {
                 </View>
 
                 {/* --- KHỐI GIÁ VÀNG --- */}
-                <View style={[styles.section, { paddingHorizontal: 16 }]}>
+                <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Giá vàng</Text>
                         <TouchableOpacity onPress={() => navigation.navigate('Gold')} style={styles.seeAllBtn}>
@@ -154,9 +150,9 @@ export default function DashboardScreen({ navigation }: any) {
                 </View>
 
                 {/* --- KHỐI TỶ GIÁ --- */}
-                <View style={[styles.section, { paddingHorizontal: 16 }]}>
+                <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Ngoại tệ (NHNN)</Text>
+                        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Tỷ giá (NHNN)</Text>
                         <TouchableOpacity onPress={() => navigation.navigate('Exchange')} style={styles.seeAllBtn}>
                             <Text style={[styles.seeAllText, { color: colors.primary }]}>Chi tiết</Text>
                             <ChevronRight size={16} color={colors.primary} />
@@ -164,63 +160,64 @@ export default function DashboardScreen({ navigation }: any) {
                     </View>
 
                     <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05 }]}>
-                        <View style={styles.listRow}>
-                            <View style={styles.listRowLeft}>
-                                <View style={[styles.iconBox, { backgroundColor: '#27AE6015' }]}>
-                                    <Banknote size={22} color="#27AE60" />
+                        <Animated.View style={{ opacity: fadeAnim }}>
+                            <View style={styles.listRow}>
+                                <View style={styles.listRowLeft}>
+                                    <View style={[styles.iconBox, { backgroundColor: '#27AE6015' }]}>
+                                        <Banknote size={22} color="#27AE60" />
+                                    </View>
+                                    <View>
+                                        <Text style={[styles.itemName, { color: colors.textPrimary }]}>USD</Text>
+                                        <Text style={[styles.itemSub, { color: colors.textSecondary }]}>Đô la Mỹ</Text>
+                                    </View>
                                 </View>
-                                <View>
-                                    <Text style={[styles.itemName, { color: colors.textPrimary }]}>USD</Text>
-                                    <Text style={[styles.itemSub, { color: colors.textSecondary }]}>Đô la Mỹ</Text>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                    <Text style={[styles.itemPrice, { color: colors.textPrimary }]}>25.450 <Text style={styles.unit}>đ</Text></Text>
+                                    <Text style={[styles.gasTrend, { color: colors.upColor }]}>+15 đ</Text>
                                 </View>
                             </View>
-                            <View style={{ alignItems: 'flex-end' }}>
-                                <Text style={[styles.itemPrice, { color: colors.textPrimary }]}>25.450 <Text style={styles.unit}>đ</Text></Text>
-                                <Text style={[styles.gasTrend, { color: colors.upColor }]}>+15 đ</Text>
-                            </View>
-                        </View>
 
-                        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                            <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-                        <View style={styles.listRow}>
-                            <View style={styles.listRowLeft}>
-                                <View style={[styles.iconBox, { backgroundColor: '#2980b915' }]}>
-                                    <Banknote size={22} color="#2980b9" />
+                            <View style={styles.listRow}>
+                                <View style={styles.listRowLeft}>
+                                    <View style={[styles.iconBox, { backgroundColor: '#2980b915' }]}>
+                                        <Banknote size={22} color="#2980b9" />
+                                    </View>
+                                    <View>
+                                        <Text style={[styles.itemName, { color: colors.textPrimary }]}>EUR</Text>
+                                        <Text style={[styles.itemSub, { color: colors.textSecondary }]}>Euro</Text>
+                                    </View>
                                 </View>
-                                <View>
-                                    <Text style={[styles.itemName, { color: colors.textPrimary }]}>EUR</Text>
-                                    <Text style={[styles.itemSub, { color: colors.textSecondary }]}>Euro</Text>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                    <Text style={[styles.itemPrice, { color: colors.textPrimary }]}>27.120 <Text style={styles.unit}>đ</Text></Text>
+                                    <Text style={[styles.gasTrend, { color: colors.downColor }]}>-45 đ</Text>
                                 </View>
                             </View>
-                            <View style={{ alignItems: 'flex-end' }}>
-                                <Text style={[styles.itemPrice, { color: colors.textPrimary }]}>27.120 <Text style={styles.unit}>đ</Text></Text>
-                                <Text style={[styles.gasTrend, { color: colors.downColor }]}>-45 đ</Text>
-                            </View>
-                        </View>
 
-                        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                            <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-                        <View style={styles.listRow}>
-                            <View style={styles.listRowLeft}>
-                                <View style={[styles.iconBox, { backgroundColor: '#8e44ad15' }]}>
-                                    <Banknote size={22} color="#8e44ad" />
+                            <View style={styles.listRow}>
+                                <View style={styles.listRowLeft}>
+                                    <View style={[styles.iconBox, { backgroundColor: '#8e44ad15' }]}>
+                                        <Banknote size={22} color="#8e44ad" />
+                                    </View>
+                                    <View>
+                                        <Text style={[styles.itemName, { color: colors.textPrimary }]}>GBP</Text>
+                                        <Text style={[styles.itemSub, { color: colors.textSecondary }]}>Bảng Anh</Text>
+                                    </View>
                                 </View>
-                                <View>
-                                    <Text style={[styles.itemName, { color: colors.textPrimary }]}>GBP</Text>
-                                    <Text style={[styles.itemSub, { color: colors.textSecondary }]}>Bảng Anh</Text>
+                                <View style={{ alignItems: 'flex-end' }}>
+                                    <Text style={[styles.itemPrice, { color: colors.textPrimary }]}>31.850 <Text style={styles.unit}>đ</Text></Text>
+                                    <Text style={[styles.gasTrend, { color: colors.upColor }]}>+20 đ</Text>
                                 </View>
                             </View>
-                            <View style={{ alignItems: 'flex-end' }}>
-                                <Text style={[styles.itemPrice, { color: colors.textPrimary }]}>31.850 <Text style={styles.unit}>đ</Text></Text>
-                                <Text style={[styles.gasTrend, { color: colors.upColor }]}>+20 đ</Text>
-                            </View>
-                        </View>
+                        </Animated.View>
                     </View>
                 </View>
 
             </ScrollView>
 
-            {/* --- HEADER NỔI & KÍNH MỜ (LIQUID GLASS) --- */}
             <BlurView
                 intensity={100}
                 tint={isDarkMode ? 'dark' : 'light'}
@@ -300,6 +297,7 @@ const styles = StyleSheet.create({
     gasTrend: { fontSize: 12, fontWeight: '700' },
 
     listCard: {
+        marginHorizontal: 16,
         borderRadius: 20,
         borderWidth: 1,
         padding: 16,

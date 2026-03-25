@@ -4,7 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { Droplet, Coins, Banknote, LayoutDashboard, Settings } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import HomeScreen from '../screens/HomeScreen';
+import GasPriceScreen from '../screens/GasPriceScreen';
 import GoldPriceScreen from '../screens/GoldPriceScreen';
 import ExchangeRateScreen from '../screens/ExchangeRateScreen';
 import DashboardScreen from '../screens/DashboardScreen';
@@ -66,9 +66,9 @@ export default function AppNavigator() {
                 />
                 <Tab.Screen
                     name="Gas"
-                    component={HomeScreen}
+                    component={GasPriceScreen}
                     options={{
-                        tabBarLabel: 'Giá Xăng',
+                        tabBarLabel: 'Xăng dầu',
                         tabBarIcon: ({ color, size }) => <Droplet size={size} color={color} strokeWidth={2.5} />
                     }}
                 />
@@ -76,7 +76,7 @@ export default function AppNavigator() {
                     name="Gold"
                     component={GoldPriceScreen}
                     options={{
-                        tabBarLabel: 'Giá Vàng',
+                        tabBarLabel: 'Vàng bạc',
                         tabBarIcon: ({ color, size }) => <Coins size={size} color={color} strokeWidth={2} />
                     }}
                 />
@@ -84,7 +84,7 @@ export default function AppNavigator() {
                     name="Exchange"
                     component={ExchangeRateScreen}
                     options={{
-                        tabBarLabel: 'Tỷ Giá',
+                        tabBarLabel: 'Tỷ giá',
                         tabBarIcon: ({ color, size }) => <Banknote size={size} color={color} strokeWidth={2} />
                     }}
                 />
