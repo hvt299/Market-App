@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Fuel, TrendingUp, TrendingDown } from 'lucide-react-native';
+import { Fuel, TrendingUp, TrendingDown, Minus } from 'lucide-react-native';
 import { formatCurrency, getLogo } from '../utils/helpers';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -13,20 +13,28 @@ interface GasItemCardProps {
 export const GasItemCard: React.FC<GasItemCardProps> = ({ item, providerId, onPress }) => {
     const { colors, isDarkMode } = useTheme();
     const logoUrl = getLogo(providerId);
+
     const isPvoil = providerId.toLowerCase() === 'pvoil';
     const displayTitle = item.title.replace(/^Xăng\s+/i, '');
 
-    const renderTrendBadge = (change: number) => {
-        if (!change || change === 0) return null;
+    // Hàm render Badge Tăng/Giảm có hỗ trợ size nhỏ cho Vùng 2
+    const renderTrendBadge = (change: number, isSmall = false) => {
+        if (change === undefined || change === 0) return null;
 
         const isUp = change > 0;
         const color = isUp ? colors.upColor : colors.downColor;
         const Icon = isUp ? TrendingUp : TrendingDown;
 
+        // Setup kích thước dựa trên cờ isSmall
+        const iconSize = isSmall ? 12 : 14;
+        const fontSize = isSmall ? 11 : 13;
+        const padV = isSmall ? 2 : 4;
+        const padH = isSmall ? 6 : 8;
+
         return (
-            <View style={[styles.trendBadge, { backgroundColor: `${color}15` }]}>
-                <Icon size={12} color={color} />
-                <Text style={[styles.trendText, { color }]}>{Math.abs(change)}</Text>
+            <View style={[styles.trendBadge, { backgroundColor: `${color}15`, paddingVertical: padV, paddingHorizontal: padH }]}>
+                <Icon size={iconSize} color={color} />
+                <Text style={[styles.trendText, { color, fontSize }]}>{Math.abs(change)}</Text>
             </View>
         );
     };
@@ -69,14 +77,16 @@ export const GasItemCard: React.FC<GasItemCardProps> = ({ item, providerId, onPr
                     </View>
                 ) : (
                     <>
+                        {/* Vùng 1 - Size tiêu chuẩn */}
                         <View style={styles.priceRow}>
                             {renderTrendBadge(item.change1)}
                             <Text style={[styles.priceText, { color: colors.textPrimary }]}>
                                 {formatCurrency(item.zone1_price)} <Text style={styles.unit}>đ</Text>
                             </Text>
                         </View>
+                        {/* Vùng 2 - Size nhỏ (isSmall = true) */}
                         <View style={[styles.priceRow, { marginTop: 6 }]}>
-                            {renderTrendBadge(item.change2)}
+                            {renderTrendBadge(item.change2, true)}
                             <Text style={[styles.priceTextSub, { color: colors.textSecondary }]}>
                                 {formatCurrency(item.zone2_price)} <Text style={styles.unit}>đ</Text>
                             </Text>
@@ -100,6 +110,6 @@ const styles = StyleSheet.create({
     priceText: { fontSize: 17, fontWeight: '800', letterSpacing: -0.5 },
     priceTextSub: { fontSize: 15, fontWeight: '600', letterSpacing: -0.5 },
     unit: { fontSize: 12, fontWeight: '600' },
-    trendBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 6 },
-    trendText: { fontSize: 11, fontWeight: '700', marginLeft: 2 }
+    trendBadge: { flexDirection: 'row', alignItems: 'center', borderRadius: 6 },
+    trendText: { fontWeight: '700', marginLeft: 2 }
 });

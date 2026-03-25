@@ -135,7 +135,7 @@ export default function GasPriceScreen({ navigation }: any) {
     }, []);
 
     const handlePressItem = (item: any) => {
-        console.log("Chi tiết:", item.title);
+        navigation.navigate('GasDetail', { gasItem: item, provider: selectedProvider.id });
     };
 
     const filteredData = gasData.filter(item => {
