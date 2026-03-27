@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Activit
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import axios from 'axios';
+import { parse } from 'node-html-parser';
 import { useTheme } from '../theme/ThemeContext';
 import { Droplet, Coins, Banknote, ChevronRight, TrendingUp, TrendingDown, Minus } from 'lucide-react-native';
 import { getPreviousDay, formatCurrency } from '../utils/helpers';
@@ -21,13 +22,14 @@ export default function DashboardScreen({ navigation }: any) {
 
     const [gasList, setGasList] = useState<any[]>([]);
     const [loadingGas, setLoadingGas] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
 
-    const goldSources = [
-        { name: 'SJC', sub: 'Hồ Chí Minh', sell: '80.500', buy: '78.500' },
-        { name: 'DOJI', sub: 'Hà Nội', sell: '80.500', buy: '78.500' },
-        { name: 'PNJ', sub: 'Hồ Chí Minh', sell: '80.400', buy: '78.400' }
-    ];
+    const [dashboardGold, setDashboardGold] = useState([
+        { brand: 'SJC', region: 'TP. Hồ Chí Minh', mieng: { buy: '...', sell: '...' }, nhan: { buy: '...', sell: '...' } },
+        { brand: 'DOJI', region: 'Hà Nội', mieng: { buy: '...', sell: '...' }, nhan: { buy: '...', sell: '...' } },
+        { brand: 'PNJ', region: 'Hà Nội', mieng: { buy: '...', sell: '...' }, nhan: { buy: '...', sell: '...' } },
+    ]);
+    const [loadingGold, setLoadingGold] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
     const fetchDashboardGas = async () => {
         try {
@@ -41,7 +43,6 @@ export default function DashboardScreen({ navigation }: any) {
 
             const todayData = response.data[0] || [];
             const yesterdayData = response.data[2] || [];
-
             const targetKeywords = ['RON 95-V', 'RON 95-III', 'E5 RON 92-II', 'E10 RON 95-III'];
             const widgetColors = ['#e74c3c', '#e67e22', '#27AE60', '#f39c12'];
 
@@ -50,7 +51,6 @@ export default function DashboardScreen({ navigation }: any) {
                 if (!todayItem) return null;
 
                 const yesterdayItem = yesterdayData.find((item: any) => item.title === todayItem.title);
-
                 const change1 = yesterdayItem ? todayItem.zone1_price - yesterdayItem.zone1_price : 0;
                 const change2 = yesterdayItem ? todayItem.zone2_price - yesterdayItem.zone2_price : 0;
 
@@ -70,17 +70,74 @@ export default function DashboardScreen({ navigation }: any) {
             console.log("Lỗi fetch xăng Dashboard:", error);
         } finally {
             setLoadingGas(false);
-            setRefreshing(false);
         }
     };
 
+    const fetchDashboardGold = async () => {
+        try {
+            const [resSJC, resDOJI, resPNJ] = await Promise.all([
+                axios.get('https://giavang.org/trong-nuoc/sjc/').catch(() => null),
+                axios.get('https://giavang.org/trong-nuoc/doji/').catch(() => null),
+                axios.get('https://giavang.org/trong-nuoc/pnj/').catch(() => null),
+            ]);
+
+            const extractAllPrices = (html: string | null) => {
+                const items: any[] = [];
+                if (!html) return items;
+                const root = parse(html);
+                const mainBox = root.querySelector('.gold-price-box');
+
+                if (mainBox) {
+                    const titles = mainBox.querySelectorAll('h2');
+                    titles.forEach((h2Node) => {
+                        const title = h2Node.text.trim();
+                        const row = h2Node.nextElementSibling;
+                        if (row && row.classNames.includes('row')) {
+                            let buy = row.querySelector('.box-cgre .gold-price')?.text.replace('x1000đ/lượng', '').trim() || '...';
+                            let sell = row.querySelector('.box-cred .gold-price')?.text.replace('x1000đ/lượng', '').trim() || '...';
+                            items.push({ title, buy, sell });
+                        }
+                    });
+                }
+                return items;
+            };
+
+            const sjcList = extractAllPrices(resSJC?.data);
+            const dojiList = extractAllPrices(resDOJI?.data);
+            const pnjList = extractAllPrices(resPNJ?.data);
+
+            const getMiengNhan = (list: any[]) => {
+                if (list.length === 0) return { mieng: { buy: '...', sell: '...' }, nhan: { buy: '...', sell: '...' } };
+                const nhan = list.find(item => item.title.toLowerCase().includes('nhẫn')) || { buy: '...', sell: '...' };
+                const mieng = list.find(item => !item.title.toLowerCase().includes('nhẫn')) || list[0];
+                return { mieng, nhan };
+            };
+
+            setDashboardGold([
+                { brand: 'SJC', region: 'TP. Hồ Chí Minh', ...getMiengNhan(sjcList) },
+                { brand: 'DOJI', region: 'Hà Nội', ...getMiengNhan(dojiList) },
+                { brand: 'PNJ', region: 'Hà Nội', ...getMiengNhan(pnjList) }
+            ]);
+
+        } catch (error) {
+            console.log("Lỗi fetch vàng Dashboard:", error);
+        } finally {
+            setLoadingGold(false);
+        }
+    };
+
+    const loadAllData = async () => {
+        setRefreshing(true);
+        await Promise.all([fetchDashboardGas(), fetchDashboardGold()]);
+        setRefreshing(false);
+    };
+
     useEffect(() => {
-        fetchDashboardGas();
+        loadAllData();
     }, []);
 
     const onRefresh = useCallback(() => {
-        setRefreshing(true);
-        fetchDashboardGas();
+        loadAllData();
     }, []);
 
     useEffect(() => {
@@ -99,7 +156,7 @@ export default function DashboardScreen({ navigation }: any) {
                     useNativeDriver: true,
                 }).start();
             });
-        }, 5000);
+        }, 6000);
 
         return () => clearInterval(interval);
     }, []);
@@ -162,6 +219,8 @@ export default function DashboardScreen({ navigation }: any) {
         );
     };
 
+    const currentGold = dashboardGold[goldIndex];
+
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
 
@@ -191,7 +250,7 @@ export default function DashboardScreen({ navigation }: any) {
                     )}
                 </View>
 
-                {/* --- KHỐI GIÁ VÀNG --- */}
+                {/* --- KHỐI GIÁ VÀNG MỚI (VÀNG MIẾNG + VÀNG NHẪN) --- */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Giá vàng</Text>
@@ -201,32 +260,40 @@ export default function DashboardScreen({ navigation }: any) {
                         </TouchableOpacity>
                     </View>
 
-                    <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05 }]}>
-                        <Animated.View style={[styles.listRow, { opacity: fadeAnim }]}>
-                            <View style={styles.listRowLeft}>
-                                <View style={[styles.iconBox, { backgroundColor: '#F1C40F15' }]}>
-                                    <Coins size={22} color="#F1C40F" />
-                                </View>
-                                <View>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                                        <Text style={[styles.itemName, { color: colors.textPrimary, marginBottom: 0 }]}>
-                                            Vàng miếng {goldSources[goldIndex].name}
-                                        </Text>
+                    <View style={[styles.goldDashCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05 }]}>
+                        {loadingGold ? (
+                            <ActivityIndicator size="small" color="#F1C40F" style={{ marginVertical: 20 }} />
+                        ) : (
+                            <Animated.View style={{ opacity: fadeAnim }}>
+                                <View style={styles.goldDashHeader}>
+                                    <View style={[styles.iconBox, { backgroundColor: '#F1C40F15', width: 40, height: 40, marginRight: 12 }]}>
+                                        <Coins size={20} color="#F1C40F" />
                                     </View>
-                                    <Text style={[styles.itemSub, { color: colors.textSecondary }]}>
-                                        Khu vực {goldSources[goldIndex].sub}
-                                    </Text>
+                                    <View>
+                                        <Text style={[styles.itemName, { color: colors.textPrimary, marginBottom: 2 }]}>{currentGold.brand}</Text>
+                                        <Text style={[styles.itemSub, { color: colors.textSecondary }]}>Khu vực {currentGold.region}</Text>
+                                    </View>
                                 </View>
-                            </View>
-                            <View style={{ alignItems: 'flex-end' }}>
-                                <Text style={[styles.itemPrice, { color: colors.upColor }]}>
-                                    {goldSources[goldIndex].sell} <Text style={styles.unit}>bán</Text>
-                                </Text>
-                                <Text style={[styles.subPrice, { color: colors.downColor }]}>
-                                    {goldSources[goldIndex].buy} <Text style={styles.unit}>mua</Text>
-                                </Text>
-                            </View>
-                        </Animated.View>
+
+                                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+                                <View style={styles.goldTypeRow}>
+                                    <Text style={[styles.goldTypeText, { color: colors.textPrimary }]}>Vàng miếng</Text>
+                                    <View style={styles.goldPriceBlock}>
+                                        <Text style={[styles.subPrice, { color: colors.downColor }]}>{currentGold.mieng.buy} <Text style={styles.unit}>mua</Text></Text>
+                                        <Text style={[styles.itemPrice, { color: colors.upColor }]}>{currentGold.mieng.sell} <Text style={styles.unit}>bán</Text></Text>
+                                    </View>
+                                </View>
+
+                                <View style={[styles.goldTypeRow, { marginTop: 14 }]}>
+                                    <Text style={[styles.goldTypeText, { color: colors.textPrimary }]}>Vàng nhẫn</Text>
+                                    <View style={styles.goldPriceBlock}>
+                                        <Text style={[styles.subPrice, { color: colors.downColor }]}>{currentGold.nhan.buy} <Text style={styles.unit}>mua</Text></Text>
+                                        <Text style={[styles.itemPrice, { color: colors.upColor }]}>{currentGold.nhan.sell} <Text style={styles.unit}>bán</Text></Text>
+                                    </View>
+                                </View>
+                            </Animated.View>
+                        )}
                     </View>
                 </View>
 
@@ -376,6 +443,21 @@ const styles = StyleSheet.create({
     zoneBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
     zoneText: { fontSize: 10, fontWeight: '800' },
     gasTrend: { fontSize: 12, fontWeight: '700' },
+
+    goldDashCard: {
+        marginHorizontal: 16,
+        borderRadius: 20,
+        borderWidth: 1,
+        padding: 16,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 8,
+    },
+    goldDashHeader: { flexDirection: 'row', alignItems: 'center' },
+    goldTypeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    goldTypeText: { fontSize: 15, fontWeight: '700' },
+    goldPriceBlock: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 
     listCard: {
         marginHorizontal: 16,
