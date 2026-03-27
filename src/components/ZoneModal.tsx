@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, Modal, TouchableOpacity, SectionList, StyleSheet } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ZONE_2_DATA } from '../constants/zoneData';
+import { useTheme } from '../theme/ThemeContext';
 
 interface ZoneModalProps {
     visible: boolean;
@@ -10,47 +11,119 @@ interface ZoneModalProps {
 
 export const ZoneModal: React.FC<ZoneModalProps> = ({ visible, onClose }) => {
     const insets = useSafeAreaInsets();
+    const { colors, isDarkMode } = useTheme();
 
     return (
         <Modal
             animationType="slide"
-            transparent={true}
+            transparent
             visible={visible}
             onRequestClose={onClose}
+            statusBarTranslucent
         >
             <View style={styles.modalOverlay}>
-                <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
+                <TouchableOpacity
+                    style={StyleSheet.absoluteFill}
+                    activeOpacity={1}
+                    onPress={onClose}
+                />
+
+                <View
+                    style={[
+                        styles.modalContent,
+                        { backgroundColor: colors.surface, paddingBottom: insets.bottom + 20 }
+                    ]}
+                >
                     <View style={styles.modalHeader}>
                         <View>
-                            <Text style={styles.modalTitle}>Danh Mục Vùng 2</Text>
-                            <Text style={styles.modalSubtitle}>Theo QĐ 630/PLX-QĐ-TGĐ</Text>
+                            <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
+                                Danh Mục Vùng 2
+                            </Text>
+                            <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
+                                Theo QĐ 630/PLX-QĐ-TGĐ
+                            </Text>
                         </View>
-                        <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                            <Text style={styles.closeButton}>Đóng</Text>
+                        <TouchableOpacity
+                            onPress={onClose}
+                            style={[styles.closeButtonBox, { backgroundColor: colors.border }]}
+                        >
+                            <Text style={{ fontSize: 14, color: colors.textPrimary, fontWeight: 'bold' }}>
+                                Đóng
+                            </Text>
                         </TouchableOpacity>
                     </View>
 
-                    <Text style={styles.modalNote}>
+                    <Text
+                        style={[
+                            styles.modalNote,
+                            {
+                                color: colors.textSecondary,
+                                backgroundColor: isDarkMode ? '#2c2c2e' : '#f9f9f9',
+                                borderLeftColor: colors.primary
+                            }
+                        ]}
+                    >
                         (*) Giá bán Vùng 2 cao hơn tối đa 2% so với giá điều hành.
-                        {"\n"}Riêng mặt hàng Madút tại Bà Rịa - Vũng Tàu áp dụng giá Vùng 1.
+                        {'\n'}Riêng mặt hàng Madút tại <Text style={{ fontWeight: '700', color: colors.primary }}>Bà Rịa - Vũng Tàu</Text> áp dụng giá Vùng 1.
                     </Text>
 
-                    <SectionList
-                        sections={ZONE_2_DATA}
-                        keyExtractor={(item, index) => item + index}
-                        renderItem={({ item }) => (
-                            <View style={styles.provinceItem}>
-                                <Text style={styles.provinceText}>• {item}</Text>
-                            </View>
-                        )}
-                        renderSectionHeader={({ section: { title } }) => (
-                            <View style={styles.sectionHeader}>
-                                <Text style={styles.sectionHeaderText}>{title}</Text>
-                            </View>
-                        )}
-                        contentContainerStyle={{ paddingBottom: 20 }}
+                    <ScrollView
                         showsVerticalScrollIndicator={false}
-                    />
+                        keyboardShouldPersistTaps="handled"
+                        contentContainerStyle={{ paddingBottom: 20 }}
+                    >
+                        {ZONE_2_DATA.map((section, index) => {
+                            const isLongTextSection = index === 1;
+
+                            return (
+                                <View key={index} style={styles.sectionContainer}>
+                                    <View
+                                        style={[
+                                            styles.sectionHeader,
+                                            { backgroundColor: isDarkMode ? colors.border : '#dfe4ea' }
+                                        ]}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.sectionHeaderText,
+                                                { color: colors.textPrimary }
+                                            ]}
+                                        >
+                                            {section.title}
+                                        </Text>
+                                    </View>
+
+                                    <View style={styles.gridContainer}>
+                                        {section.data.map((item, idx) => {
+                                            const hasAsterisk = item.includes('*');
+
+                                            return (
+                                                <View
+                                                    key={idx}
+                                                    style={[
+                                                        isLongTextSection ? styles.fullItem : styles.gridItem,
+                                                        { borderColor: colors.border }
+                                                    ]}
+                                                >
+                                                    <Text
+                                                        style={[
+                                                            styles.provinceText,
+                                                            isLongTextSection && { textAlign: 'left', paddingLeft: 8 },
+                                                            hasAsterisk
+                                                                ? { color: colors.primary, fontWeight: '700' }
+                                                                : { color: colors.textSecondary }
+                                                        ]}
+                                                    >
+                                                        {item}
+                                                    </Text>
+                                                </View>
+                                            );
+                                        })}
+                                    </View>
+                                </View>
+                            );
+                        })}
+                    </ScrollView>
                 </View>
             </View>
         </Modal>
@@ -58,22 +131,79 @@ export const ZoneModal: React.FC<ZoneModalProps> = ({ visible, onClose }) => {
 };
 
 const styles = StyleSheet.create({
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    modalContent: {
-        backgroundColor: '#FFF', height: '85%', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20,
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'flex-end'
     },
-    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 15 },
-    modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#2c3e50' },
-    modalSubtitle: { fontSize: 13, color: '#7f8c8d', marginTop: 4 },
-    closeButton: { fontSize: 16, color: '#e67e22', fontWeight: 'bold', padding: 5 },
+    modalContent: {
+        height: '85%',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 24
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 16
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold'
+    },
+    modalSubtitle: {
+        fontSize: 13,
+        marginTop: 4
+    },
+    closeButtonBox: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20
+    },
     modalNote: {
-        fontSize: 14, color: '#57606f', fontStyle: 'italic', marginBottom: 10, lineHeight: 20,
-        backgroundColor: '#f9f9f9', padding: 12, borderRadius: 8, borderLeftWidth: 3, borderLeftColor: '#e67e22'
+        fontSize: 13,
+        fontStyle: 'italic',
+        marginBottom: 16,
+        lineHeight: 20,
+        padding: 12,
+        borderRadius: 8,
+        borderLeftWidth: 3
+    },
+    sectionContainer: {
+        marginBottom: 16
     },
     sectionHeader: {
-        backgroundColor: '#dfe4ea', paddingVertical: 8, paddingHorizontal: 12, marginTop: 15, marginBottom: 5, borderRadius: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 6,
+        marginBottom: 8
     },
-    sectionHeaderText: { fontSize: 14, fontWeight: 'bold', color: '#2f3542', textTransform: 'uppercase' },
-    provinceItem: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f1f1f1', paddingLeft: 10 },
-    provinceText: { fontSize: 16, color: '#34495e' },
+    sectionHeaderText: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        textTransform: 'uppercase'
+    },
+    gridContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginHorizontal: -4
+    },
+    gridItem: {
+        width: '33.33%',
+        paddingHorizontal: 4,
+        paddingVertical: 6,
+        justifyContent: 'center'
+    },
+    fullItem: {
+        width: '100%',
+        paddingHorizontal: 4,
+        paddingVertical: 6,
+        justifyContent: 'center'
+    },
+    provinceText: {
+        fontSize: 13,
+        textAlign: 'center',
+        fontWeight: '500'
+    }
 });
