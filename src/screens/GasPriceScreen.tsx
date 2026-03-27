@@ -155,7 +155,7 @@ export default function GasPriceScreen({ navigation }: any) {
             <SafeAreaView style={styles.headerContainer} edges={['top', 'left', 'right']}>
                 <View style={styles.topBar}>
                     <View>
-                        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Giá Xăng Dầu</Text>
+                        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Giá xăng dầu</Text>
                         <Text style={[styles.updateText, { color: colors.textSecondary }]}>Cập nhật: {lastUpdated}</Text>
                     </View>
                     {selectedProvider.id === 'Petrolimex' && (

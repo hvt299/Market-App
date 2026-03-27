@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, ActivityIndicator, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import axios from 'axios';
@@ -21,6 +21,7 @@ export default function DashboardScreen({ navigation }: any) {
 
     const [gasList, setGasList] = useState<any[]>([]);
     const [loadingGas, setLoadingGas] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
     const goldSources = [
         { name: 'SJC', sub: 'Hồ Chí Minh', sell: '80.500', buy: '78.500' },
@@ -28,49 +29,57 @@ export default function DashboardScreen({ navigation }: any) {
         { name: 'PNJ', sub: 'Hồ Chí Minh', sell: '80.400', buy: '78.400' }
     ];
 
-    useEffect(() => {
-        const fetchDashboardGas = async () => {
-            try {
-                let targetDate = new Date().toISOString().substring(0, 10);
-                let response = await axios.get(`https://giaxanghomnay.com/api/pvdate/${targetDate}`);
+    const fetchDashboardGas = async () => {
+        try {
+            let targetDate = new Date().toISOString().substring(0, 10);
+            let response = await axios.get(`https://giaxanghomnay.com/api/pvdate/${targetDate}`);
 
-                if (!Array.isArray(response.data) || response.data.length < 2) {
-                    targetDate = getPreviousDay(targetDate);
-                    response = await axios.get(`https://giaxanghomnay.com/api/pvdate/${targetDate}`);
-                }
-
-                const todayData = response.data[0] || [];
-                const yesterdayData = response.data[2] || [];
-
-                const targetKeywords = ['RON 95-V', 'RON 95-III', 'E5 RON 92-II', 'E10 RON 95-III'];
-                const widgetColors = ['#e74c3c', '#e67e22', '#27AE60', '#f39c12'];
-
-                const processed = targetKeywords.map((keyword, index) => {
-                    const todayItem = todayData.find((item: any) => item.title.includes(keyword));
-                    if (!todayItem) return null;
-
-                    const yesterdayItem = yesterdayData.find((item: any) => item.title === todayItem.title);
-                    const change = yesterdayItem ? todayItem.zone1_price - yesterdayItem.zone1_price : 0;
-
-                    return {
-                        rawItem: todayItem,
-                        title: todayItem.title.replace(/^Xăng\s+/i, ''),
-                        price1: formatCurrency(todayItem.zone1_price),
-                        price2: formatCurrency(todayItem.zone2_price),
-                        trendValue: change,
-                        trendStr: change > 0 ? `+${change}` : change < 0 ? `${change}` : '0',
-                        color: widgetColors[index],
-                    };
-                }).filter(Boolean);
-
-                setGasList(processed);
-            } catch (error) {
-                console.log("Lỗi fetch xăng Dashboard:", error);
-            } finally {
-                setLoadingGas(false);
+            if (!Array.isArray(response.data) || response.data.length < 2) {
+                targetDate = getPreviousDay(targetDate);
+                response = await axios.get(`https://giaxanghomnay.com/api/pvdate/${targetDate}`);
             }
-        };
 
+            const todayData = response.data[0] || [];
+            const yesterdayData = response.data[2] || [];
+
+            const targetKeywords = ['RON 95-V', 'RON 95-III', 'E5 RON 92-II', 'E10 RON 95-III'];
+            const widgetColors = ['#e74c3c', '#e67e22', '#27AE60', '#f39c12'];
+
+            const processed = targetKeywords.map((keyword, index) => {
+                const todayItem = todayData.find((item: any) => item.title.includes(keyword));
+                if (!todayItem) return null;
+
+                const yesterdayItem = yesterdayData.find((item: any) => item.title === todayItem.title);
+
+                const change1 = yesterdayItem ? todayItem.zone1_price - yesterdayItem.zone1_price : 0;
+                const change2 = yesterdayItem ? todayItem.zone2_price - yesterdayItem.zone2_price : 0;
+
+                return {
+                    rawItem: todayItem,
+                    title: todayItem.title.replace(/^Xăng\s+/i, ''),
+                    price1: formatCurrency(todayItem.zone1_price),
+                    price2: formatCurrency(todayItem.zone2_price),
+                    trendValue1: change1,
+                    trendValue2: change2,
+                    color: widgetColors[index],
+                };
+            }).filter(Boolean);
+
+            setGasList(processed);
+        } catch (error) {
+            console.log("Lỗi fetch xăng Dashboard:", error);
+        } finally {
+            setLoadingGas(false);
+            setRefreshing(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchDashboardGas();
+    }, []);
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
         fetchDashboardGas();
     }, []);
 
@@ -96,7 +105,10 @@ export default function DashboardScreen({ navigation }: any) {
     }, []);
 
     const GasWidget = ({ data }: any) => {
-        const { title, price1, price2, trendValue, trendStr, color, rawItem } = data;
+        const { title, price1, price2, trendValue1, trendValue2, color, rawItem } = data;
+
+        const trendValue = isZone1 ? trendValue1 : trendValue2;
+        const trendStr = trendValue > 0 ? `+${trendValue}` : trendValue < 0 ? `${trendValue}` : '0';
         const isUp = trendValue > 0;
         const isDown = trendValue < 0;
 
@@ -156,6 +168,7 @@ export default function DashboardScreen({ navigation }: any) {
             <ScrollView
                 contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 115 }]}
                 showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} progressViewOffset={insets.top + 115} />}
             >
                 {/* --- KHỐI XĂNG DẦU --- */}
                 <View style={styles.section}>
@@ -220,7 +233,7 @@ export default function DashboardScreen({ navigation }: any) {
                 {/* --- KHỐI TỶ GIÁ --- */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Ngoại tệ (NHNN)</Text>
+                        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Tỷ giá (NHNN)</Text>
                         <TouchableOpacity onPress={() => navigation.navigate('Exchange')} style={styles.seeAllBtn}>
                             <Text style={[styles.seeAllText, { color: colors.primary }]}>Chi tiết</Text>
                             <ChevronRight size={16} color={colors.primary} />
