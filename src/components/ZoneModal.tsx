@@ -19,6 +19,7 @@ export const ZoneModal: React.FC<ZoneModalProps> = ({ visible, onClose }) => {
             transparent
             visible={visible}
             onRequestClose={onClose}
+            statusBarTranslucent
         >
             <View style={styles.modalOverlay}>
                 <TouchableOpacity

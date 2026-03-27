@@ -129,10 +129,10 @@ export default function GasPriceScreen({ navigation }: any) {
         setFilterModalVisible(false);
     };
 
-    const onRefresh = useCallback(() => {
+    const onRefresh = () => {
         setRefreshing(true);
         fetchGasPrices();
-    }, []);
+    };
 
     const handlePressItem = (item: any) => {
         navigation.navigate('GasDetail', { gasItem: item, provider: selectedProvider.id });
@@ -155,7 +155,7 @@ export default function GasPriceScreen({ navigation }: any) {
             <SafeAreaView style={styles.headerContainer} edges={['top', 'left', 'right']}>
                 <View style={styles.topBar}>
                     <View>
-                        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Giá Xăng Dầu</Text>
+                        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Giá xăng dầu</Text>
                         <Text style={[styles.updateText, { color: colors.textSecondary }]}>Cập nhật: {lastUpdated}</Text>
                     </View>
                     {selectedProvider.id === 'Petrolimex' && (
@@ -215,7 +215,7 @@ export default function GasPriceScreen({ navigation }: any) {
             <ZoneModal visible={modalVisible} onClose={() => setModalVisible(false)} />
 
             {/* --- MODAL BỘ LỌC (Sử dụng State Tạm) --- */}
-            <Modal visible={filterModalVisible} transparent animationType="fade">
+            <Modal visible={filterModalVisible} transparent animationType="fade" statusBarTranslucent>
                 <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setFilterModalVisible(false)}>
                     <TouchableOpacity activeOpacity={1} style={[styles.filterModalContent, { backgroundColor: colors.surface }]}>
                         <View style={styles.filterModalHeader}>
