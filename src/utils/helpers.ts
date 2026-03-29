@@ -42,12 +42,12 @@ export const getLogo = (code: string) => {
         'Mi Hồng': 'https://www.mihong.vn/assets/images/logos/logo-desktop.png',
         'Ngọc Thẩm': 'https://hvnclc.vn/wp-content/uploads/2021/06/Ng%E1%BB%8Dc-Th%E1%BA%A9m-Jewelry-Logo.jpg',
         'VCB': 'https://cdn.haitrieu.com/wp-content/uploads/2022/02/Icon-Vietcombank.png',
-        'BIDV': 'https://upload.wikimedia.org/wikipedia/commons/6/69/Logo_BIDV.png',
-        'AGRI': 'https://upload.wikimedia.org/wikipedia/commons/a/a8/Logo_Agribank.png',
-        'HDB': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/HDBank_logo.svg/2560px-HDBank_logo.svg.png',
-        'TPB': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Logo_TPBank.svg/2560px-Logo_TPBank.svg.png',
-        'NHNN': 'https://upload.wikimedia.org/wikipedia/vi/a/a2/Logo_Ng%C3%A2n_h%C3%A0ng_Nh%C3%A0_n%C6%B0%E1%BB%9Bc_Vi%E1%BB%87t_Nam.png',
-        'USD': 'https://flagsapi.com/US/flat/64.png',
+        'BIDV': 'https://cdn.haitrieu.com/wp-content/uploads/2022/01/Icon-BIDV-.png',
+        'AGRI': 'https://play-lh.googleusercontent.com/rNSXUqGnK-ljK6qUdUmy7h_sDrMOzZ1nPwAUAwshsmPaQuwNGn0Xwj-psgFrBSJOHg',
+        'HDB': 'https://hdbank.com.vn/favicon.ico',
+        'TPB': 'https://cdn.haitrieu.com/wp-content/uploads/2022/02/Icon-TPBank.png',
+        'NHNN': 'https://sbv.gov.vn/documents/20117/32829/logo-nhnnvn-favicon.png/7c6d31ad-f40a-06ba-459e-030f95935ae5',
+        'EUR': 'https://aimsvietnam.com/wp-content/uploads/eu-la-gi-aims-viet-nam-1.png',
     };
     return map[code] || null;
 };

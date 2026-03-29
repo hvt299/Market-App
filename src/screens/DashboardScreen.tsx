@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import axios from 'axios';
 import { parse } from 'node-html-parser';
 import { useTheme } from '../theme/ThemeContext';
 import { Droplet, Coins, Banknote, ChevronRight, TrendingUp, TrendingDown, Minus } from 'lucide-react-native';
-import { getPreviousDay, formatCurrency } from '../utils/helpers';
+import { getPreviousDay, formatCurrency, getLogo } from '../utils/helpers';
 
 export default function DashboardScreen({ navigation }: any) {
     const { colors, isDarkMode } = useTheme();
@@ -33,7 +33,20 @@ export default function DashboardScreen({ navigation }: any) {
         { brandId: 'bac-phu-quy', brand: 'Bạc Phú Quý', region: 'Đang tải...', item1: { title: 'Bạc miếng 1 Lượng', buy: '...', sell: '...', unit: 'đ/lượng' }, item2: { title: 'Bạc thỏi 10 Lượng', buy: '...', sell: '...', unit: 'đ/lượng' } }
     ]);
 
+    const [exchangeRates, setExchangeRates] = useState<any[]>([]);
+    const [loadingExchange, setLoadingExchange] = useState(true);
+    const [exchangeStateIndex, setExchangeStateIndex] = useState(0);
+
     const [refreshing, setRefreshing] = useState(false);
+
+    const formatVNRate = (value: string) => {
+        if (!value || value === '-' || value === '0' || value === '') return '-';
+        let valStr = value.toString().replace(/,/g, '');
+        let parts = valStr.split('.');
+        let intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        let decPart = parts.length > 1 ? parts[1] : '';
+        return decPart ? `${intPart},${decPart}` : intPart;
+    };
 
     const fetchDashboardGas = async () => {
         try {
@@ -171,9 +184,43 @@ export default function DashboardScreen({ navigation }: any) {
         }
     };
 
+    const fetchDashboardExchange = async () => {
+        setLoadingExchange(true);
+        try {
+            const response = await axios.get('https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx');
+            const root = parse(response.data);
+            const exrates = root.querySelectorAll('exrate');
+
+            const targetCodes = ['USD', 'EUR', 'GBP', 'JPY', 'KRW'];
+            const results: any[] = [];
+
+            exrates.forEach(node => {
+                const code = node.getAttribute('currencycode') || node.getAttribute('CurrencyCode');
+                if (code && targetCodes.includes(code)) {
+                    results.push({
+                        code: code,
+                        name: (node.getAttribute('currencyname') || node.getAttribute('CurrencyName'))?.trim(),
+                        buyCash: node.getAttribute('buy') || node.getAttribute('Buy') || '-',
+                        buyTransfer: node.getAttribute('transfer') || node.getAttribute('Transfer') || '-',
+                        sellCash: node.getAttribute('sell') || node.getAttribute('Sell') || '-',
+                        sellTransfer: '-',
+                    });
+                }
+            });
+
+            results.sort((a, b) => targetCodes.indexOf(a.code) - targetCodes.indexOf(b.code));
+            setExchangeRates(results);
+
+        } catch (error) {
+            console.log("Lỗi fetch tỷ giá Dashboard:", error);
+        } finally {
+            setLoadingExchange(false);
+        }
+    };
+
     const loadAllData = async () => {
         setRefreshing(true);
-        await Promise.all([fetchDashboardGas(), fetchMetals()]);
+        await Promise.all([fetchDashboardGas(), fetchMetals(), fetchDashboardExchange()]);
         setRefreshing(false);
     };
 
@@ -193,10 +240,11 @@ export default function DashboardScreen({ navigation }: any) {
             Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
                 setIsZone1(prev => !prev);
                 setMetalIndex(prev => (prev + 1) % len);
+                setExchangeStateIndex(prev => (prev + 1) % 4);
 
                 Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
             });
-        }, 6000);
+        }, 5000);
 
         return () => clearInterval(interval);
     }, [activeMetal, dashboardGold, dashboardSilver]);
@@ -386,7 +434,7 @@ export default function DashboardScreen({ navigation }: any) {
                 {/* --- KHỐI TỶ GIÁ --- */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Tỷ giá (NHNN)</Text>
+                        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Tỷ giá (Vietcombank)</Text>
                         <TouchableOpacity onPress={() => navigation.navigate('Exchange')} style={styles.seeAllBtn}>
                             <Text style={[styles.seeAllText, { color: colors.primary }]}>Chi tiết</Text>
                             <ChevronRight size={16} color={colors.primary} />
@@ -394,59 +442,65 @@ export default function DashboardScreen({ navigation }: any) {
                     </View>
 
                     <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05 }]}>
-                        <Animated.View style={{ opacity: fadeAnim }}>
-                            <View style={styles.listRow}>
-                                <View style={styles.listRowLeft}>
-                                    <View style={[styles.iconBox, { backgroundColor: '#27AE6015' }]}>
-                                        <Banknote size={22} color="#27AE60" />
-                                    </View>
-                                    <View>
-                                        <Text style={[styles.itemName, { color: colors.textPrimary }]}>USD</Text>
-                                        <Text style={[styles.itemSub, { color: colors.textSecondary }]}>Đô la Mỹ</Text>
-                                    </View>
-                                </View>
-                                <View style={{ alignItems: 'flex-end' }}>
-                                    <Text style={[styles.itemPrice, { color: colors.textPrimary }]}>25.450 <Text style={styles.unit}>đ</Text></Text>
-                                    <Text style={[styles.gasTrend, { color: colors.upColor }]}>+15 đ</Text>
-                                </View>
-                            </View>
+                        {loadingExchange ? (
+                            <ActivityIndicator size="small" color="#27AE60" style={{ marginVertical: 20 }} />
+                        ) : (
+                            <Animated.View style={{ opacity: fadeAnim }}>
+                                {exchangeRates.map((rate, index) => {
+                                    const cleanCode = rate.code.split('(')[0].trim();
+                                    const countryCode = cleanCode.length >= 2 ? cleanCode.substring(0, 2) : 'UN';
+                                    const flagUrl = getLogo(cleanCode) || `https://flagsapi.com/${countryCode}/flat/64.png`;
 
-                            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                                    const isLast = index === exchangeRates.length - 1;
+                                    const iconBgColors = ['#27AE6015', '#2980b915', '#8e44ad15', '#e67e2215', '#e74c3c15'];
 
-                            <View style={styles.listRow}>
-                                <View style={styles.listRowLeft}>
-                                    <View style={[styles.iconBox, { backgroundColor: '#2980b915' }]}>
-                                        <Banknote size={22} color="#2980b9" />
-                                    </View>
-                                    <View>
-                                        <Text style={[styles.itemName, { color: colors.textPrimary }]}>EUR</Text>
-                                        <Text style={[styles.itemSub, { color: colors.textSecondary }]}>Euro</Text>
-                                    </View>
-                                </View>
-                                <View style={{ alignItems: 'flex-end' }}>
-                                    <Text style={[styles.itemPrice, { color: colors.textPrimary }]}>27.120 <Text style={styles.unit}>đ</Text></Text>
-                                    <Text style={[styles.gasTrend, { color: colors.downColor }]}>-45 đ</Text>
-                                </View>
-                            </View>
+                                    let currentPrice = '';
+                                    let currentLabel = '';
+                                    let priceColor = colors.textPrimary;
 
-                            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                                    if (exchangeStateIndex === 0) {
+                                        currentPrice = formatVNRate(rate.buyCash);
+                                        currentLabel = 'Mua TM';
+                                        priceColor = colors.downColor;
+                                    } else if (exchangeStateIndex === 1) {
+                                        currentPrice = formatVNRate(rate.sellCash);
+                                        currentLabel = 'Bán TM';
+                                        priceColor = colors.upColor;
+                                    } else if (exchangeStateIndex === 2) {
+                                        currentPrice = formatVNRate(rate.buyTransfer);
+                                        currentLabel = 'Mua CK';
+                                        priceColor = colors.downColor;
+                                    } else if (exchangeStateIndex === 3) {
+                                        currentPrice = formatVNRate(rate.sellTransfer);
+                                        currentLabel = 'Bán CK';
+                                        priceColor = colors.upColor;
+                                    }
 
-                            <View style={styles.listRow}>
-                                <View style={styles.listRowLeft}>
-                                    <View style={[styles.iconBox, { backgroundColor: '#8e44ad15' }]}>
-                                        <Banknote size={22} color="#8e44ad" />
-                                    </View>
-                                    <View>
-                                        <Text style={[styles.itemName, { color: colors.textPrimary }]}>GBP</Text>
-                                        <Text style={[styles.itemSub, { color: colors.textSecondary }]}>Bảng Anh</Text>
-                                    </View>
-                                </View>
-                                <View style={{ alignItems: 'flex-end' }}>
-                                    <Text style={[styles.itemPrice, { color: colors.textPrimary }]}>31.850 <Text style={styles.unit}>đ</Text></Text>
-                                    <Text style={[styles.gasTrend, { color: colors.upColor }]}>+20 đ</Text>
-                                </View>
-                            </View>
-                        </Animated.View>
+                                    return (
+                                        <React.Fragment key={rate.code}>
+                                            <View style={styles.listRow}>
+                                                <View style={styles.listRowLeft}>
+                                                    <View style={[styles.iconBox, { backgroundColor: iconBgColors[index % 5] }]}>
+                                                        <Image source={{ uri: flagUrl }} style={{ width: 28, height: 28, borderRadius: 14 }} resizeMode="cover" />
+                                                    </View>
+                                                    <View>
+                                                        <Text style={[styles.itemName, { color: colors.textPrimary }]}>{rate.code}</Text>
+                                                        <Text style={[styles.itemSub, { color: colors.textSecondary }]}>{rate.name}</Text>
+                                                    </View>
+                                                </View>
+                                                <View style={{ alignItems: 'flex-end' }}>
+                                                    <Text style={[styles.itemPrice, { color: priceColor }]}>
+                                                        {currentPrice} {currentPrice !== '-' && <Text style={styles.unit}>đ</Text>}
+                                                    </Text>
+                                                    <Text style={[styles.gasTrend, { color: colors.textSecondary }]}>{currentLabel}</Text>
+                                                </View>
+                                            </View>
+                                            {!isLast && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
+                                        </React.Fragment>
+                                    );
+                                })}
+                            </Animated.View>
+                        )}
                     </View>
                 </View>
 

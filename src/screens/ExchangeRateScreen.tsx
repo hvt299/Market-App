@@ -1,77 +1,162 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, RefreshControl, Image, ScrollView } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, RefreshControl, Image, ScrollView, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { parse } from 'node-html-parser';
-import { Banknote } from 'lucide-react-native';
-import { CARD_STYLES, getLogo } from '../utils/helpers';
+import { Info, AlertCircle } from 'lucide-react-native';
+import { getLogo } from '../utils/helpers';
+import { useTheme } from '../theme/ThemeContext';
 
 const EXCHANGE_SOURCES = [
-    { id: 'vcb', name: 'Vietcombank', url: 'https://baomoi.com/tien-ich-ty-gia-ngoai-te-vietcombank.epi' },
-    { id: 'bidv', name: 'BIDV', url: 'https://baomoi.com/tien-ich-ty-gia-ngoai-te-bidv.epi' },
-    { id: 'agri', name: 'Agribank', url: 'https://baomoi.com/tien-ich-ty-gia-ngoai-te-agribank.epi' },
-    { id: 'hdb', name: 'HDBank', url: 'https://baomoi.com/tien-ich-ty-gia-ngoai-te-hdbank.epi' },
-    { id: 'tpb', name: 'TPBank', url: 'https://baomoi.com/tien-ich-ty-gia-ngoai-te-tpbank.epi' },
-    { id: 'nhnn', name: 'NHNN', url: 'https://baomoi.com/tien-ich-ty-gia-ngoai-te-nhnn.epi' },
+    { id: 'vcb', name: 'Vietcombank', url: 'https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx' },
+    { id: 'agri', name: 'Agribank', url: 'https://www.agribank.com.vn/vn/ty-gia' },
+    { id: 'bidv', name: 'BIDV', url: 'https://bidv.com.vn/vn/ty-gia-ngoai-te' },
+    { id: 'hdb', name: 'HDBank', url: 'https://hdbank.com.vn/vi/personal/cong-cu/exchange-rate' },
+    { id: 'tpb', name: 'TPBank', url: 'https://tpb.vn/cong-cu-tinh-toan/ty-gia-ngoai-te' },
+    { id: 'nhnn', name: 'NHNN', url: 'https://sbv.gov.vn/vi/t%E1%BB%B7-gi%C3%A1' },
 ];
 
+const CURRENCY_NAMES: Record<string, string> = {
+    'USD': 'US DOLLAR', 'EUR': 'EURO', 'GBP': 'BRITISH POUND',
+    'JPY': 'JAPANESE YEN', 'AUD': 'AUSTRALIAN DOLLAR', 'SGD': 'SINGAPORE DOLLAR',
+    'THB': 'THAI BAHT', 'CAD': 'CANADIAN DOLLAR', 'NZD': 'NEW ZEALAND DOLLAR',
+    'KRW': 'KOREAN WON', 'DKK': 'DANISH KRONE', 'NOK': 'NORWEGIAN KRONE',
+    'SEK': 'SWEDISH KRONA', 'CHF': 'SWISS FRANC', 'HKD': 'HONGKONG DOLLAR',
+    'RUB': 'RUSSIAN RUBLE', 'CNY': 'CHINESE YUAN', 'INR': 'INDIAN RUPEE',
+    'KWD': 'KUWAITI DINAR', 'MYR': 'MALAYSIAN RINGGIT', 'SAR': 'SAUDI RIAL',
+    'IDR': 'INDONESIAN RUPIAH', 'TWD': 'TAIWAN DOLLAR', 'MOP': 'MACANESE PATACA',
+    'TRY': 'TURKISH LIRA', 'BRL': 'BRAZILIAN REAL', 'PLN': 'POLISH ZLOTY',
+    'AED': 'UAE DIRHAM', 'ZAR': 'SOUTH AFRICAN RAND', 'CZK': 'CZECH KORUNA',
+    'PHP': 'PHILIPPINE PESO', 'HUF': 'HUNGARIAN FORINT', 'LAK': 'LAO KIP'
+};
+
 export default function ExchangeRateScreen() {
+    const { colors, isDarkMode } = useTheme();
     const [selectedBank, setSelectedBank] = useState(EXCHANGE_SOURCES[0]);
     const [rates, setRates] = useState<any[]>([]);
     const [lastUpdated, setLastUpdated] = useState('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [isMaintenance, setIsMaintenance] = useState(false);
 
     useEffect(() => {
-        fetchExchangeRates(selectedBank.url);
+        fetchExchangeRates(selectedBank);
     }, [selectedBank]);
 
-    const fetchExchangeRates = async (url: string) => {
-        setLoading(true);
-        try {
-            const response = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-            const html = response.data;
-            const root = parse(html);
+    const formatVNRate = (value: string) => {
+        if (!value || value === '-' || value === '0' || value === '') return '-';
+        let valStr = value.toString().replace(/,/g, '');
+        let parts = valStr.split('.');
+        let intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        let decPart = parts.length > 1 ? parts[1] : '';
+        return decPart ? `${intPart},${decPart} đ` : `${intPart} đ`;
+    };
 
-            const titleNode = root.querySelector('h2.ut-title');
-            if (titleNode) {
-                const fullText = titleNode.text.trim();
-                const dateMatch = fullText.match(/Ngày\s+(.*)/);
-                if (dateMatch) {
-                    setLastUpdated(dateMatch[1]);
-                } else {
-                    setLastUpdated('');
+    const fetchExchangeRates = async (bank: typeof EXCHANGE_SOURCES[0]) => {
+        setLoading(true);
+        setIsMaintenance(false);
+
+        if (['hdb', 'tpb', 'bidv', 'nhnn'].includes(bank.id)) {
+            setRates([]);
+            setLastUpdated('--:--');
+            setIsMaintenance(true);
+            setLoading(false);
+            setRefreshing(false);
+            return;
+        }
+
+        try {
+            const response = await axios.get(bank.url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+            const data = response.data;
+            const root = parse(data);
+            const items: any[] = [];
+            let updatedTime = '';
+
+            if (bank.id === 'vcb') {
+                const timeNode = root.querySelector('datetime') || root.querySelector('DateTime');
+                if (timeNode) {
+                    const rawTime = timeNode.text.trim();
+                    const match = rawTime.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})\s+(AM|PM)/i);
+                    if (match) {
+                        let mo = match[1].padStart(2, '0');
+                        let dd = match[2].padStart(2, '0');
+                        let yy = match[3];
+                        let hh = parseInt(match[4], 10);
+                        let mm = match[5].padStart(2, '0');
+                        let ss = match[6].padStart(2, '0');
+                        let ampm = match[7].toUpperCase();
+
+                        if (ampm === 'PM' && hh < 12) hh += 12;
+                        if (ampm === 'AM' && hh === 12) hh = 0;
+
+                        let hhs = String(hh).padStart(2, '0');
+                        updatedTime = `${hhs}:${mm}:${ss} ${dd}/${mo}/${yy}`;
+                    } else {
+                        updatedTime = rawTime;
+                    }
+                }
+
+                const exrates = root.querySelectorAll('exrate');
+                exrates.forEach((node, index) => {
+                    const code = node.getAttribute('currencycode') || node.getAttribute('CurrencyCode');
+                    if (code) {
+                        items.push({
+                            id: index.toString(),
+                            code: code,
+                            name: (node.getAttribute('currencyname') || node.getAttribute('CurrencyName') || '').trim(),
+                            buyCash: node.getAttribute('buy') || node.getAttribute('Buy') || '-',
+                            buyTransfer: node.getAttribute('transfer') || node.getAttribute('Transfer') || '-',
+                            sellCash: node.getAttribute('sell') || node.getAttribute('Sell') || '-',
+                            sellTransfer: '-',
+                        });
+                    }
+                });
+            } else if (bank.id === 'agri') {
+                const timeNode = root.querySelector('.luu_ycc');
+                if (timeNode) {
+                    const match = timeNode.text.match(/lúc\s+([0-9:]+)\s+ngày\s+([0-9\/]+)/i);
+                    if (match) {
+                        let timeStr = match[1];
+                        if (timeStr.length === 5) timeStr += ':00';
+                        updatedTime = `${timeStr} ${match[2]}`;
+                    }
+                }
+
+                const rows = root.querySelectorAll('tr');
+                rows.forEach((row, index) => {
+                    const tds = row.querySelectorAll('td');
+                    if (tds.length >= 4) {
+                        const code = tds[0].text.trim();
+                        const buyCash = tds[1].text.replace(/&nbsp;/g, '').trim();
+                        const buyTransfer = tds[2].text.replace(/&nbsp;/g, '').trim();
+                        const sell = tds[3].text.replace(/&nbsp;/g, '').trim();
+
+                        if (code && code.length === 3) {
+                            items.push({
+                                id: index.toString(),
+                                code: code,
+                                name: CURRENCY_NAMES[code] || '',
+                                buyCash: buyCash || '-',
+                                buyTransfer: buyTransfer || '-',
+                                sellCash: sell || '-',
+                                sellTransfer: '-',
+                            });
+                        }
+                    }
+                });
+            }
+
+            const uniqueItems = [];
+            const map = new Map();
+            for (const item of items) {
+                if (!map.has(item.code) && item.code !== '-') {
+                    map.set(item.code, true);
+                    uniqueItems.push(item);
                 }
             }
 
-            const items: any[] = [];
-            const rows = root.querySelectorAll('.rc-table-row');
-
-            rows.forEach((row, index) => {
-                const cells = row.querySelectorAll('td');
-
-                if (cells.length >= 6) {
-                    const code = cells[1].text.trim().split(' ')[0];
-                    const name = cells[1].querySelector('div.truncate')?.text.trim() || '';
-
-                    const buyCash = cells[2].text.trim();
-                    const buyTransfer = cells[3].text.trim();
-                    const sellCash = cells[4].text.trim();
-                    const sellTransfer = cells[5].text.trim();
-
-                    items.push({
-                        id: index.toString(),
-                        code,
-                        name,
-                        buyCash: buyCash === '-' ? '_' : buyCash,
-                        buyTransfer: buyTransfer === '-' ? '_' : buyTransfer,
-                        sellCash: sellCash === '-' ? '_' : sellCash,
-                        sellTransfer: sellTransfer === '-' ? '_' : sellTransfer,
-                    });
-                }
-            });
-
-            setRates(items);
+            setRates(uniqueItems);
+            setLastUpdated(updatedTime || `00:00:00 ${new Date().toLocaleDateString('vi-VN')}`);
 
         } catch (error) {
             console.error("Lỗi lấy tỷ giá:", error);
@@ -84,36 +169,66 @@ export default function ExchangeRateScreen() {
 
     const onRefresh = useCallback(() => {
         setRefreshing(true);
-        fetchExchangeRates(selectedBank.url);
+        fetchExchangeRates(selectedBank);
     }, [selectedBank]);
 
-    const renderItem = ({ item }: { item: any }) => {
-        const countryCode = item.code.substring(0, 2);
-        const flagUrl = `https://flagsapi.com/${countryCode}/flat/64.png`;
+    const renderItem = ({ item, index }: { item: any; index: number }) => {
+        const cleanCode = item.code.split('(')[0].trim();
+        const countryCode = cleanCode.length >= 2 ? cleanCode.substring(0, 2) : 'UN';
+        const flagUrl = getLogo(cleanCode) || `https://flagsapi.com/${countryCode}/flat/64.png`;
+
+        const bankLogoUrl = getLogo(selectedBank.id.toUpperCase());
+        const iconBgColors = ['#27AE6015', '#2980b915', '#8e44ad15', '#e67e2215', '#e74c3c15'];
 
         return (
-            <View style={styles.card}>
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+
+                <View style={styles.watermarkWrapper}>
+                    {bankLogoUrl && (
+                        <Image
+                            source={{ uri: bankLogoUrl }}
+                            style={styles.watermarkLogo}
+                            resizeMode="contain"
+                            blurRadius={1.5}
+                        />
+                    )}
+                </View>
+
                 <View style={styles.cardTop}>
-                    {flagUrl ? <Image source={{ uri: flagUrl }} style={styles.flag} resizeMode="contain" /> :
-                        <Banknote size={32} color="#27ae60" style={{ marginRight: 10 }} />}
-                    <View>
-                        <Text style={styles.currencyCode}>{item.code}</Text>
-                        <Text style={styles.currencyName}>{item.name}</Text>
+                    <View style={[styles.iconBox, { backgroundColor: iconBgColors[index % 5] }]}>
+                        <Image source={{ uri: flagUrl }} style={styles.flag} resizeMode="cover" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={[styles.currencyCode, { color: colors.textPrimary }]}>{item.code}</Text>
+                        {item.name ? <Text style={[styles.currencyName, { color: colors.textSecondary }]} numberOfLines={1}>{item.name}</Text> : null}
                     </View>
                 </View>
 
-                <View style={styles.divider} />
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
                 <View style={styles.priceContainer}>
-                    {/* MUA */}
                     <View style={styles.priceCol}>
-                        <Text style={styles.headLabel}>MUA (TM)</Text>
-                        <Text style={[styles.priceVal, { color: '#27ae60' }]}>{item.buyCash}</Text>
+                        <Text style={[styles.headLabel, { color: colors.textSecondary }]}>MUA TM</Text>
+                        <Text style={[styles.priceVal, { color: colors.downColor }]} numberOfLines={1} adjustsFontSizeToFit>{formatVNRate(item.buyCash)}</Text>
                     </View>
-                    {/* BÁN */}
+                    <View style={[styles.verticalLine, { backgroundColor: colors.border }]} />
                     <View style={styles.priceCol}>
-                        <Text style={styles.headLabel}>BÁN (TM)</Text>
-                        <Text style={[styles.priceVal, { color: '#e74c3c' }]}>{item.sellCash}</Text>
+                        <Text style={[styles.headLabel, { color: colors.textSecondary }]}>MUA CK</Text>
+                        <Text style={[styles.priceVal, { color: colors.downColor }]} numberOfLines={1} adjustsFontSizeToFit>{formatVNRate(item.buyTransfer)}</Text>
+                    </View>
+                </View>
+
+                <View style={[styles.divider, { backgroundColor: colors.border, marginVertical: 8, opacity: 0.5 }]} />
+
+                <View style={styles.priceContainer}>
+                    <View style={styles.priceCol}>
+                        <Text style={[styles.headLabel, { color: colors.textSecondary }]}>BÁN TM</Text>
+                        <Text style={[styles.priceVal, { color: colors.upColor }]} numberOfLines={1} adjustsFontSizeToFit>{formatVNRate(item.sellCash)}</Text>
+                    </View>
+                    <View style={[styles.verticalLine, { backgroundColor: colors.border }]} />
+                    <View style={styles.priceCol}>
+                        <Text style={[styles.headLabel, { color: colors.textSecondary }]}>BÁN CK</Text>
+                        <Text style={[styles.priceVal, { color: colors.upColor }]} numberOfLines={1} adjustsFontSizeToFit>{formatVNRate(item.sellTransfer)}</Text>
                     </View>
                 </View>
             </View>
@@ -121,62 +236,127 @@ export default function ExchangeRateScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+            <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
+
             <SafeAreaView style={styles.headerContainer} edges={['top', 'left', 'right']}>
-                <View style={styles.headerContent}>
-                    <Text style={styles.headerTitle}>TỶ GIÁ NGOẠI TỆ</Text>
+                <View style={styles.topBar}>
+                    <View>
+                        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Tỷ giá ngoại tệ</Text>
+                        <Text style={[styles.updateText, { color: colors.textSecondary }]}>Cập nhật: {lastUpdated || '--:--'}</Text>
+                    </View>
                 </View>
-                <View style={{ height: 50 }}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 10 }}>
-                        {EXCHANGE_SOURCES.map((bank) => (
-                            <TouchableOpacity
-                                key={bank.id}
-                                style={[styles.bankChip, selectedBank.id === bank.id && styles.activeChip]}
-                                onPress={() => setSelectedBank(bank)}
-                            >
-                                {/* Có thể thêm logo ngân hàng nhỏ vào đây */}
-                                <Text style={[styles.chipText, selectedBank.id === bank.id && styles.activeChipText]}>{bank.name}</Text>
-                            </TouchableOpacity>
-                        ))}
+
+                <View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsWrapper}>
+                        {EXCHANGE_SOURCES.map((bank) => {
+                            const isActive = selectedBank.id === bank.id;
+                            return (
+                                <TouchableOpacity
+                                    key={bank.id}
+                                    style={[
+                                        styles.tabItem,
+                                        {
+                                            backgroundColor: isActive ? colors.primary : 'transparent',
+                                            borderColor: isActive ? colors.primary : colors.border
+                                        }
+                                    ]}
+                                    onPress={() => setSelectedBank(bank)}
+                                >
+                                    <Text style={[styles.tabText, { color: isActive ? '#FFF' : colors.textSecondary }]}>
+                                        {bank.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
                     </ScrollView>
                 </View>
             </SafeAreaView>
 
+            <View style={styles.infoSection}>
+                <View style={styles.legendRow}>
+                    <Info size={14} color={colors.textSecondary} />
+                    <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                        Chú ý: TM (Tiền mặt) - CK (Chuyển khoản).
+                    </Text>
+                </View>
+            </View>
+
             <View style={styles.body}>
-                {loading ? <ActivityIndicator size="large" color="#1e272e" style={{ marginTop: 50 }} /> :
+                {loading ? (
+                    <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
+                ) : isMaintenance ? (
+                    <View style={styles.maintenanceContainer}>
+                        <AlertCircle size={48} color={colors.textSecondary} style={{ marginBottom: 16 }} />
+                        <Text style={[styles.maintenanceText, { color: colors.textPrimary }]}>Hệ thống đang bảo trì</Text>
+                        <Text style={[styles.maintenanceSubText, { color: colors.textSecondary }]}>Vui lòng thử lại sau.</Text>
+                    </View>
+                ) : (
                     <FlatList
                         data={rates}
                         renderItem={renderItem}
+                        initialNumToRender={10}
+                        maxToRenderPerBatch={10}
+                        windowSize={5}
+                        removeClippedSubviews={true}
                         contentContainerStyle={styles.list}
-                        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
+                        ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 40, color: colors.textSecondary }}>Không có dữ liệu.</Text>}
                     />
-                }
+                )}
             </View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F5F7FA' },
-    headerContainer: { backgroundColor: '#1e272e', paddingBottom: 10 },
-    headerContent: { alignItems: 'center', marginBottom: 15, paddingTop: 10 },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#FFF' },
+    container: { flex: 1 },
+    headerContainer: { paddingBottom: 10, paddingTop: 10 },
 
-    bankChip: { backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8, justifyContent: 'center' },
-    activeChip: { backgroundColor: '#e67e22' },
-    chipText: { color: '#bdc3c7', fontWeight: '600' },
-    activeChipText: { color: '#FFF' },
+    topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 15 },
+    headerTitle: { fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+    updateText: { fontSize: 13, fontWeight: '600', marginTop: 2 },
+
+    chipsWrapper: { paddingHorizontal: 16, paddingBottom: 10, gap: 10 },
+    tabItem: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+    tabText: { fontWeight: '600', fontSize: 14 },
+
+    infoSection: { paddingHorizontal: 20, paddingBottom: 10 },
+    legendRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    legendText: { fontSize: 12, fontStyle: 'italic' },
 
     body: { flex: 1 },
-    list: { padding: 16 },
-    card: { ...CARD_STYLES },
-    cardTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-    flag: { width: 36, height: 36, marginRight: 12, borderRadius: 18, backgroundColor: '#f0f0f0' },
-    currencyCode: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50' },
-    currencyName: { fontSize: 12, color: '#95a5a6' },
-    divider: { height: 1, backgroundColor: '#eee', marginBottom: 10 },
-    priceContainer: { flexDirection: 'row', justifyContent: 'space-between' },
+    list: { paddingHorizontal: 16, paddingBottom: 20 },
+
+    card: { borderRadius: 20, borderWidth: 1, marginBottom: 16, padding: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowRadius: 8, overflow: 'hidden' },
+
+    watermarkWrapper: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 0,
+    },
+    watermarkLogo: {
+        width: 140,
+        height: 140,
+        opacity: 0.05
+    },
+
+    cardTop: { flexDirection: 'row', alignItems: 'center', zIndex: 1 },
+    iconBox: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+    flag: { width: 28, height: 28, borderRadius: 14 },
+    currencyCode: { fontSize: 18, fontWeight: '800' },
+    currencyName: { fontSize: 12, marginTop: 2 },
+
+    divider: { height: 1, marginVertical: 12, zIndex: 1 },
+
+    priceContainer: { flexDirection: 'row', justifyContent: 'space-between', zIndex: 1 },
     priceCol: { flex: 1, alignItems: 'center' },
-    headLabel: { fontSize: 11, fontWeight: '700', color: '#95a5a6' },
-    priceVal: { fontSize: 18, fontWeight: 'bold', marginTop: 4 },
+    verticalLine: { width: 1, height: '100%' },
+    headLabel: { fontSize: 11, fontWeight: '700', marginBottom: 6 },
+    priceVal: { fontSize: 15, fontWeight: '800' },
+
+    maintenanceContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 60 },
+    maintenanceText: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
+    maintenanceSubText: { fontSize: 14 }
 });
