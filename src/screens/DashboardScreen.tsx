@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Activit
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import axios from 'axios';
+import { parse } from 'node-html-parser';
 import { useTheme } from '../theme/ThemeContext';
 import { Droplet, Coins, Banknote, ChevronRight, TrendingUp, TrendingDown, Minus } from 'lucide-react-native';
 import { getPreviousDay, formatCurrency } from '../utils/helpers';
@@ -16,18 +17,23 @@ export default function DashboardScreen({ navigation }: any) {
     });
 
     const [isZone1, setIsZone1] = useState(true);
-    const [goldIndex, setGoldIndex] = useState(0);
     const fadeAnim = useRef(new Animated.Value(1)).current;
 
     const [gasList, setGasList] = useState<any[]>([]);
     const [loadingGas, setLoadingGas] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
 
-    const goldSources = [
-        { name: 'SJC', sub: 'Hồ Chí Minh', sell: '80.500', buy: '78.500' },
-        { name: 'DOJI', sub: 'Hà Nội', sell: '80.500', buy: '78.500' },
-        { name: 'PNJ', sub: 'Hồ Chí Minh', sell: '80.400', buy: '78.400' }
-    ];
+    const [activeMetal, setActiveMetal] = useState<'gold' | 'silver'>('gold');
+    const [metalIndex, setMetalIndex] = useState(0);
+    const [loadingMetal, setLoadingMetal] = useState(true);
+
+    const [dashboardGold, setDashboardGold] = useState<any[]>([
+        { brandId: 'sjc', brand: 'SJC', region: 'TP. Hồ Chí Minh', item1: { buy: '...', sell: '...' }, item2: { buy: '...', sell: '...' } },
+    ]);
+    const [dashboardSilver, setDashboardSilver] = useState<any[]>([
+        { brandId: 'bac-phu-quy', brand: 'Bạc Phú Quý', region: 'Đang tải...', item1: { title: 'Bạc miếng 1 Lượng', buy: '...', sell: '...', unit: 'đ/lượng' }, item2: { title: 'Bạc thỏi 10 Lượng', buy: '...', sell: '...', unit: 'đ/lượng' } }
+    ]);
+
+    const [refreshing, setRefreshing] = useState(false);
 
     const fetchDashboardGas = async () => {
         try {
@@ -41,7 +47,6 @@ export default function DashboardScreen({ navigation }: any) {
 
             const todayData = response.data[0] || [];
             const yesterdayData = response.data[2] || [];
-
             const targetKeywords = ['RON 95-V', 'RON 95-III', 'E5 RON 92-II', 'E10 RON 95-III'];
             const widgetColors = ['#e74c3c', '#e67e22', '#27AE60', '#f39c12'];
 
@@ -50,7 +55,6 @@ export default function DashboardScreen({ navigation }: any) {
                 if (!todayItem) return null;
 
                 const yesterdayItem = yesterdayData.find((item: any) => item.title === todayItem.title);
-
                 const change1 = yesterdayItem ? todayItem.zone1_price - yesterdayItem.zone1_price : 0;
                 const change2 = yesterdayItem ? todayItem.zone2_price - yesterdayItem.zone2_price : 0;
 
@@ -70,39 +74,139 @@ export default function DashboardScreen({ navigation }: any) {
             console.log("Lỗi fetch xăng Dashboard:", error);
         } finally {
             setLoadingGas(false);
-            setRefreshing(false);
         }
     };
 
+    const fetchMetals = async () => {
+        setLoadingMetal(true);
+        try {
+            const [resSJC, resDOJI, resPNJ, resSilver] = await Promise.all([
+                axios.get('https://giavang.org/trong-nuoc/sjc/').catch(() => null),
+                axios.get('https://giavang.org/trong-nuoc/doji/').catch(() => null),
+                axios.get('https://giavang.org/trong-nuoc/pnj/').catch(() => null),
+                axios.get('https://giabac.phuquygroup.vn/').catch(() => null),
+            ]);
+
+            const extractGoldPrices = (html: string | null) => {
+                const items: any[] = [];
+                if (!html) return items;
+                const root = parse(html);
+                const mainBox = root.querySelector('.gold-price-box');
+
+                if (mainBox) {
+                    const titles = mainBox.querySelectorAll('h2');
+                    titles.forEach((h2Node) => {
+                        const title = h2Node.text.trim();
+                        const row = h2Node.nextElementSibling;
+                        if (row && row.classNames.includes('row')) {
+                            let buy = row.querySelector('.box-cgre .gold-price')?.text.replace('x1000đ/lượng', '').trim() || '...';
+                            let sell = row.querySelector('.box-cred .gold-price')?.text.replace('x1000đ/lượng', '').trim() || '...';
+                            items.push({ title, buy, sell });
+                        }
+                    });
+                }
+                return items;
+            };
+
+            const sjcList = extractGoldPrices(resSJC?.data);
+            const dojiList = extractGoldPrices(resDOJI?.data);
+            const pnjList = extractGoldPrices(resPNJ?.data);
+
+            const formatGoldGroup = (brandId: string, brand: string, region: string, list: any[]) => {
+                if (list.length === 0) return { brandId, brand, region, item1: { title: 'Vàng miếng', buy: '...', sell: '...', unit: 'k/lượng' }, item2: { title: 'Vàng nhẫn', buy: '...', sell: '...', unit: 'k/lượng' } };
+                const nhan = list.find(item => item.title.toLowerCase().includes('nhẫn')) || { buy: '...', sell: '...' };
+                const mieng = list.find(item => !item.title.toLowerCase().includes('nhẫn')) || list[0];
+                return {
+                    brandId, brand, region,
+                    item1: { title: 'Vàng miếng', buy: mieng.buy, sell: mieng.sell, unit: 'k/lượng' },
+                    item2: { title: 'Vàng nhẫn', buy: nhan.buy, sell: nhan.sell, unit: 'k/lượng' }
+                };
+            };
+
+            setDashboardGold([
+                formatGoldGroup('sjc', 'SJC', 'TP. Hồ Chí Minh', sjcList),
+                formatGoldGroup('doji', 'DOJI', 'Hà Nội', dojiList),
+                formatGoldGroup('pnj', 'PNJ', 'Hà Nội', pnjList)
+            ]);
+
+            if (resSilver && resSilver.data) {
+                const root = parse(resSilver.data);
+                const silverProducts: any[] = [];
+
+                const productNodes = root.querySelectorAll('.col-product');
+
+                productNodes.forEach(node => {
+                    const row = node.parentNode;
+                    if (row) {
+                        const tds = row.querySelectorAll('td');
+                        if (tds.length >= 4) {
+                            let title = tds[0].text.replace(/\s+/g, ' ').trim();
+
+                            if (title.includes('BẠC MIẾNG')) title = 'Bạc miếng 1 Lượng';
+                            else if (title.includes('10 LƯỢNG')) title = 'Bạc thỏi 10 Lượng';
+                            else if (title.includes('ĐỒNG BẠC')) title = 'Đồng bạc mỹ nghệ';
+                            else if (title.includes('1KILO')) title = 'Bạc thỏi 1 Kilo';
+
+                            let unit = tds[1].text.trim().toLowerCase() === 'vnđ/kg' ? 'đ/kg' : 'đ/lượng';
+                            let buy = tds[2].text.trim();
+                            let sell = tds[3].text.trim();
+
+                            silverProducts.push({ title, unit, buy, sell });
+                        }
+                    }
+                });
+
+                if (silverProducts.length >= 4) {
+                    setDashboardSilver([
+                        { brandId: 'bac-phu-quy', brand: 'Bạc Phú Quý', region: 'Toàn quốc', item1: silverProducts[0], item2: silverProducts[1] },
+                        { brandId: 'bac-phu-quy', brand: 'Bạc Phú Quý', region: 'Toàn quốc', item1: silverProducts[2], item2: silverProducts[3] }
+                    ]);
+                }
+            }
+
+        } catch (error) {
+            console.log("Lỗi fetch kim loại quý:", error);
+        } finally {
+            setLoadingMetal(false);
+        }
+    };
+
+    const loadAllData = async () => {
+        setRefreshing(true);
+        await Promise.all([fetchDashboardGas(), fetchMetals()]);
+        setRefreshing(false);
+    };
+
     useEffect(() => {
-        fetchDashboardGas();
+        loadAllData();
     }, []);
 
     const onRefresh = useCallback(() => {
-        setRefreshing(true);
-        fetchDashboardGas();
+        loadAllData();
     }, []);
 
     useEffect(() => {
-        const interval = setInterval(() => {
-            Animated.timing(fadeAnim, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-            }).start(() => {
-                setIsZone1(prev => !prev);
-                setGoldIndex(prev => (prev + 1) % 3);
+        const currentList = activeMetal === 'gold' ? dashboardGold : dashboardSilver;
+        const len = currentList.length || 1;
 
-                Animated.timing(fadeAnim, {
-                    toValue: 1,
-                    duration: 300,
-                    useNativeDriver: true,
-                }).start();
+        const interval = setInterval(() => {
+            Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
+                setIsZone1(prev => !prev);
+                setMetalIndex(prev => (prev + 1) % len);
+
+                Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
             });
-        }, 5000);
+        }, 6000);
 
         return () => clearInterval(interval);
-    }, []);
+    }, [activeMetal, dashboardGold, dashboardSilver]);
+
+    const handleMetalTabChange = (tab: 'gold' | 'silver') => {
+        if (tab !== activeMetal) {
+            setActiveMetal(tab);
+            setMetalIndex(0);
+        }
+    };
 
     const GasWidget = ({ data }: any) => {
         const { title, price1, price2, trendValue1, trendValue2, color, rawItem } = data;
@@ -162,6 +266,10 @@ export default function DashboardScreen({ navigation }: any) {
         );
     };
 
+    const currentMetalData = activeMetal === 'gold'
+        ? (dashboardGold[metalIndex] || dashboardGold[0])
+        : (dashboardSilver[metalIndex] || dashboardSilver[0]);
+
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
 
@@ -191,43 +299,88 @@ export default function DashboardScreen({ navigation }: any) {
                     )}
                 </View>
 
-                {/* --- KHỐI GIÁ VÀNG --- */}
+                {/* --- KHỐI KIM LOẠI QUÝ (VÀNG / BẠC) --- */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Giá vàng</Text>
-                        <TouchableOpacity onPress={() => navigation.navigate('Gold')} style={styles.seeAllBtn}>
+                        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Vàng bạc</Text>
+                        <TouchableOpacity onPress={() => navigation.navigate('Gold', { activeBrand: currentMetalData?.brandId })} style={styles.seeAllBtn}>
                             <Text style={[styles.seeAllText, { color: colors.primary }]}>Chi tiết</Text>
                             <ChevronRight size={16} color={colors.primary} />
                         </TouchableOpacity>
                     </View>
 
-                    <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05 }]}>
-                        <Animated.View style={[styles.listRow, { opacity: fadeAnim }]}>
-                            <View style={styles.listRowLeft}>
-                                <View style={[styles.iconBox, { backgroundColor: '#F1C40F15' }]}>
-                                    <Coins size={22} color="#F1C40F" />
-                                </View>
-                                <View>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                                        <Text style={[styles.itemName, { color: colors.textPrimary, marginBottom: 0 }]}>
-                                            Vàng miếng {goldSources[goldIndex].name}
-                                        </Text>
-                                    </View>
-                                    <Text style={[styles.itemSub, { color: colors.textSecondary }]}>
-                                        Khu vực {goldSources[goldIndex].sub}
-                                    </Text>
-                                </View>
-                            </View>
-                            <View style={{ alignItems: 'flex-end' }}>
-                                <Text style={[styles.itemPrice, { color: colors.upColor }]}>
-                                    {goldSources[goldIndex].sell} <Text style={styles.unit}>bán</Text>
-                                </Text>
-                                <Text style={[styles.subPrice, { color: colors.downColor }]}>
-                                    {goldSources[goldIndex].buy} <Text style={styles.unit}>mua</Text>
-                                </Text>
-                            </View>
-                        </Animated.View>
+                    {/* Bộ lọc Vàng / Bạc nhanh */}
+                    <View style={styles.metalTabsWrapper}>
+                        <TouchableOpacity
+                            onPress={() => handleMetalTabChange('gold')}
+                            style={[styles.metalTab, activeMetal === 'gold' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                        >
+                            <Text style={[styles.metalTabText, { color: activeMetal === 'gold' ? '#FFF' : colors.textSecondary }]}>Vàng</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => handleMetalTabChange('silver')}
+                            style={[styles.metalTab, activeMetal === 'silver' && { backgroundColor: '#7f8c8d', borderColor: '#7f8c8d' }]}
+                        >
+                            <Text style={[styles.metalTabText, { color: activeMetal === 'silver' ? '#FFF' : colors.textSecondary }]}>Bạc</Text>
+                        </TouchableOpacity>
+                        <Text style={[styles.noteText, { color: colors.textSecondary, flex: 1, textAlign: 'right' }]}>* Đơn vị tính tùy mặt hàng</Text>
                     </View>
+
+                    <TouchableOpacity
+                        activeOpacity={0.9}
+                        onPress={() => navigation.navigate('Gold', { activeBrand: currentMetalData?.brandId })}
+                        style={[styles.goldDashCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05 }]}
+                    >
+                        {loadingMetal ? (
+                            <ActivityIndicator size="small" color="#F1C40F" style={{ marginVertical: 20 }} />
+                        ) : (
+                            <Animated.View style={{ opacity: fadeAnim }}>
+                                <View style={styles.goldDashHeader}>
+                                    <View style={[styles.iconBox, { backgroundColor: activeMetal === 'gold' ? '#F1C40F15' : '#bdc3c730', width: 40, height: 40, marginRight: 12 }]}>
+                                        <Coins size={20} color={activeMetal === 'gold' ? "#F1C40F" : "#7f8c8d"} />
+                                    </View>
+                                    <View>
+                                        <Text style={[styles.itemName, { color: colors.textPrimary, marginBottom: 2 }]}>{currentMetalData.brand}</Text>
+                                        <Text style={[styles.itemSub, { color: colors.textSecondary }]}>Khu vực: {currentMetalData.region}</Text>
+                                    </View>
+                                </View>
+
+                                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+                                {/* Sản phẩm 1 */}
+                                <View style={styles.goldTypeRow}>
+                                    <Text style={[styles.goldTypeText, { color: colors.textPrimary }]}>{currentMetalData.item1?.title}</Text>
+                                    <View style={styles.goldPriceBlock}>
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={[styles.subPrice, { color: colors.downColor }]}>{currentMetalData.item1?.buy}</Text>
+                                            <Text style={styles.unitSmall}>{currentMetalData.item1?.unit} mua</Text>
+                                        </View>
+                                        <View style={{ width: 1, height: 20, backgroundColor: colors.border, marginHorizontal: 8 }} />
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={[styles.itemPrice, { color: colors.upColor }]}>{currentMetalData.item1?.sell}</Text>
+                                            <Text style={styles.unitSmall}>{currentMetalData.item1?.unit} bán</Text>
+                                        </View>
+                                    </View>
+                                </View>
+
+                                {/* Sản phẩm 2 */}
+                                <View style={[styles.goldTypeRow, { marginTop: 14 }]}>
+                                    <Text style={[styles.goldTypeText, { color: colors.textPrimary }]}>{currentMetalData.item2?.title}</Text>
+                                    <View style={styles.goldPriceBlock}>
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={[styles.subPrice, { color: colors.downColor }]}>{currentMetalData.item2?.buy}</Text>
+                                            <Text style={styles.unitSmall}>{currentMetalData.item2?.unit} mua</Text>
+                                        </View>
+                                        <View style={{ width: 1, height: 20, backgroundColor: colors.border, marginHorizontal: 8 }} />
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <Text style={[styles.itemPrice, { color: colors.upColor }]}>{currentMetalData.item2?.sell}</Text>
+                                            <Text style={styles.unitSmall}>{currentMetalData.item2?.unit} bán</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            </Animated.View>
+                        )}
+                    </TouchableOpacity>
                 </View>
 
                 {/* --- KHỐI TỶ GIÁ --- */}
@@ -328,18 +481,8 @@ export default function DashboardScreen({ navigation }: any) {
 const styles = StyleSheet.create({
     container: { flex: 1 },
 
-    fixedHeader: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 10,
-    },
-    headerContent: {
-        paddingHorizontal: 20,
-        paddingTop: 10,
-        paddingBottom: 15,
-    },
+    fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
+    headerContent: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15 },
     greeting: { fontSize: 14, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     headerTitle: { fontSize: 32, fontWeight: '900', letterSpacing: -0.5 },
@@ -354,47 +497,38 @@ const styles = StyleSheet.create({
     seeAllBtn: { flexDirection: 'row', alignItems: 'center' },
     seeAllText: { fontSize: 14, fontWeight: '600', marginRight: 2 },
 
-    gasCard: {
-        width: 155,
-        padding: 16,
-        borderRadius: 20,
-        borderWidth: 1,
-        marginRight: 12,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowRadius: 8,
-    },
+    gasCard: { width: 155, padding: 16, borderRadius: 20, borderWidth: 1, marginRight: 12, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowRadius: 8 },
     gasCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
     iconBoxMini: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
     gasCardBody: { gap: 4 },
     gasTitle: { fontSize: 13, fontWeight: '700', marginBottom: 2 },
     priceRow: { flexDirection: 'row', alignItems: 'center' },
     gasPrice: { fontSize: 18, fontWeight: '900', letterSpacing: -0.5 },
-
     trendRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
     zoneBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
     zoneText: { fontSize: 10, fontWeight: '800' },
     gasTrend: { fontSize: 12, fontWeight: '700' },
 
-    listCard: {
-        marginHorizontal: 16,
-        borderRadius: 20,
-        borderWidth: 1,
-        padding: 16,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowRadius: 8,
-    },
+    metalTabsWrapper: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12, gap: 8 },
+    metalTab: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: '#ccc' },
+    metalTabText: { fontSize: 12, fontWeight: '700' },
+    noteText: { fontSize: 11, fontStyle: 'italic' },
+
+    goldDashCard: { marginHorizontal: 16, borderRadius: 20, borderWidth: 1, padding: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowRadius: 8 },
+    goldDashHeader: { flexDirection: 'row', alignItems: 'center' },
+    goldTypeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    goldTypeText: { fontSize: 14, fontWeight: '700', flex: 1, paddingRight: 8 },
+    goldPriceBlock: { flexDirection: 'row', alignItems: 'center' },
+    unitSmall: { fontSize: 10, color: '#7f8c8d', fontWeight: '500', marginTop: 2 },
+
+    listCard: { marginHorizontal: 16, borderRadius: 20, borderWidth: 1, padding: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowRadius: 8 },
     listRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
     listRowLeft: { flexDirection: 'row', alignItems: 'center' },
     iconBox: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
     itemName: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
     itemSub: { fontSize: 13, fontWeight: '500' },
-
     itemPrice: { fontSize: 16, fontWeight: '800' },
-    subPrice: { fontSize: 14, fontWeight: '600', marginTop: 2 },
+    subPrice: { fontSize: 15, fontWeight: '700' },
     unit: { fontSize: 12, fontWeight: '600' },
     divider: { height: 1, marginVertical: 14 },
 });
