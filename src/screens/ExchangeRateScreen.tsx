@@ -3,17 +3,19 @@ import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { parse } from 'node-html-parser';
-import { Info, AlertCircle } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
+import { Info, AlertCircle, WifiOff } from 'lucide-react-native';
 import { getLogo } from '../utils/helpers';
 import { useTheme } from '../theme/ThemeContext';
 
 const EXCHANGE_SOURCES = [
     { id: 'vcb', name: 'Vietcombank', url: 'https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx' },
     { id: 'agri', name: 'Agribank', url: 'https://www.agribank.com.vn/vn/ty-gia' },
-    { id: 'bidv', name: 'BIDV', url: 'https://bidv.com.vn/vn/ty-gia-ngoai-te' },
-    { id: 'hdb', name: 'HDBank', url: 'https://hdbank.com.vn/vi/personal/cong-cu/exchange-rate' },
-    { id: 'tpb', name: 'TPBank', url: 'https://tpb.vn/cong-cu-tinh-toan/ty-gia-ngoai-te' },
-    { id: 'nhnn', name: 'NHNN', url: 'https://sbv.gov.vn/vi/t%E1%BB%B7-gi%C3%A1' },
+    { id: 'bidv', name: 'BIDV', url: 'https://baomoi.com/tien-ich-ty-gia-ngoai-te-bidv.epi' },
+    { id: 'hdb', name: 'HDBank', url: 'https://baomoi.com/tien-ich-ty-gia-ngoai-te-hdbank.epi' },
+    { id: 'tpb', name: 'TPBank', url: 'https://baomoi.com/tien-ich-ty-gia-ngoai-te-tpbank.epi' },
+    { id: 'nhnn', name: 'NHNN', url: 'https://baomoi.com/tien-ich-ty-gia-ngoai-te-nhnn.epi' },
 ];
 
 const CURRENCY_NAMES: Record<string, string> = {
@@ -38,6 +40,7 @@ export default function ExchangeRateScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [isMaintenance, setIsMaintenance] = useState(false);
+    const [isOffline, setIsOffline] = useState(false);
 
     useEffect(() => {
         fetchExchangeRates(selectedBank);
@@ -56,14 +59,22 @@ export default function ExchangeRateScreen() {
         setLoading(true);
         setIsMaintenance(false);
 
-        if (['hdb', 'tpb', 'bidv', 'nhnn'].includes(bank.id)) {
-            setRates([]);
-            setLastUpdated('--:--');
-            setIsMaintenance(true);
-            setLoading(false);
-            setRefreshing(false);
+        const netState = await NetInfo.fetch();
+        if (!netState.isConnected) {
+            setIsOffline(true);
+            const cached = await AsyncStorage.getItem(`cache_exchange_${bank.id}`);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                setRates(parsed.rates);
+                setLastUpdated(parsed.time);
+            } else {
+                setRates([]);
+            }
+            setLoading(false); setRefreshing(false);
             return;
         }
+
+        setIsOffline(false);
 
         try {
             const response = await axios.get(bank.url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
@@ -111,7 +122,8 @@ export default function ExchangeRateScreen() {
                         });
                     }
                 });
-            } else if (bank.id === 'agri') {
+            }
+            else if (bank.id === 'agri') {
                 const timeNode = root.querySelector('.luu_ycc');
                 if (timeNode) {
                     const match = timeNode.text.match(/lúc\s+([0-9:]+)\s+ngày\s+([0-9\/]+)/i);
@@ -145,6 +157,42 @@ export default function ExchangeRateScreen() {
                     }
                 });
             }
+            else if (bank.url.includes('baomoi.com')) {
+                const titleNode = root.querySelector('h2.ut-title');
+                if (titleNode) {
+                    const timeMatch = titleNode.text.match(/(\d{2})-(\d{2})-(\d{4})\s+(\d{2}:\d{2})/);
+                    if (timeMatch) {
+                        updatedTime = `${timeMatch[4]}:00 ${timeMatch[1]}/${timeMatch[2]}/${timeMatch[3]}`;
+                    }
+                }
+
+                const rows = root.querySelectorAll('.rc-table-tbody .rc-table-row');
+                rows.forEach((row, index) => {
+                    const tds = row.querySelectorAll('td');
+                    if (tds.length >= 6) {
+                        const rawCode = tds[1].text.trim();
+                        const codeMatch = rawCode.match(/^[A-Z]{3}/);
+
+                        if (codeMatch) {
+                            const code = codeMatch[0];
+                            const buyCash = tds[2].text.trim() || '-';
+                            const buyTransfer = tds[3].text.trim() || '-';
+                            const sellCash = tds[4].text.trim() || '-';
+                            const sellTransfer = tds[5].text.trim() || '-';
+
+                            items.push({
+                                id: index.toString(),
+                                code: code,
+                                name: CURRENCY_NAMES[code] || '',
+                                buyCash: buyCash,
+                                buyTransfer: buyTransfer,
+                                sellCash: sellCash,
+                                sellTransfer: sellTransfer,
+                            });
+                        }
+                    }
+                });
+            }
 
             const uniqueItems = [];
             const map = new Map();
@@ -155,8 +203,11 @@ export default function ExchangeRateScreen() {
                 }
             }
 
+            const finalTime = updatedTime || `00:00:00 ${new Date().toLocaleDateString('vi-VN')}`;
             setRates(uniqueItems);
-            setLastUpdated(updatedTime || `00:00:00 ${new Date().toLocaleDateString('vi-VN')}`);
+            setLastUpdated(finalTime);
+
+            await AsyncStorage.setItem(`cache_exchange_${bank.id}`, JSON.stringify({ rates: uniqueItems, time: finalTime }));
 
         } catch (error) {
             console.error("Lỗi lấy tỷ giá:", error);
@@ -176,8 +227,8 @@ export default function ExchangeRateScreen() {
         const cleanCode = item.code.split('(')[0].trim();
         const countryCode = cleanCode.length >= 2 ? cleanCode.substring(0, 2) : 'UN';
         const flagUrl = getLogo(cleanCode) || `https://flagsapi.com/${countryCode}/flat/64.png`;
-
         const bankLogoUrl = getLogo(selectedBank.id.toUpperCase());
+
         const iconBgColors = ['#27AE6015', '#2980b915', '#8e44ad15', '#e67e2215', '#e74c3c15'];
 
         return (
@@ -274,16 +325,22 @@ export default function ExchangeRateScreen() {
             </SafeAreaView>
 
             <View style={styles.infoSection}>
+                {isOffline && (
+                    <View style={styles.offlineBanner}>
+                        <WifiOff size={16} color="#FFF" style={{ marginRight: 6 }} />
+                        <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '700' }}>Ngoại tuyến. Dữ liệu lưu tạm.</Text>
+                    </View>
+                )}
                 <View style={styles.legendRow}>
                     <Info size={14} color={colors.textSecondary} />
                     <Text style={[styles.legendText, { color: colors.textSecondary }]}>
-                        Chú ý: TM (Tiền mặt) - CK (Chuyển khoản).
+                        Chú ý: TM (Tiền mặt) - CK (Chuyển khoản)
                     </Text>
                 </View>
             </View>
 
             <View style={styles.body}>
-                {loading ? (
+                {loading && !isOffline ? (
                     <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
                 ) : isMaintenance ? (
                     <View style={styles.maintenanceContainer}>
@@ -295,10 +352,6 @@ export default function ExchangeRateScreen() {
                     <FlatList
                         data={rates}
                         renderItem={renderItem}
-                        initialNumToRender={10}
-                        maxToRenderPerBatch={10}
-                        windowSize={5}
-                        removeClippedSubviews={true}
                         contentContainerStyle={styles.list}
                         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
                         ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 40, color: colors.textSecondary }}>Không có dữ liệu.</Text>}
@@ -324,6 +377,7 @@ const styles = StyleSheet.create({
     infoSection: { paddingHorizontal: 20, paddingBottom: 10 },
     legendRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     legendText: { fontSize: 12, fontStyle: 'italic' },
+    offlineBanner: { backgroundColor: '#e74c3c', flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, marginBottom: 8 },
 
     body: { flex: 1 },
     list: { paddingHorizontal: 16, paddingBottom: 20 },

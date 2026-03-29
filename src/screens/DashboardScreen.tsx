@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, ActivityIndicator, RefreshControl, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, ActivityIndicator, RefreshControl, Image, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import axios from 'axios';
 import { parse } from 'node-html-parser';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { useTheme } from '../theme/ThemeContext';
-import { Droplet, Coins, Banknote, ChevronRight, TrendingUp, TrendingDown, Minus } from 'lucide-react-native';
+import { Droplet, Coins, Banknote, ChevronRight, TrendingUp, TrendingDown, Minus, WifiOff } from 'lucide-react-native';
 import { getPreviousDay, formatCurrency, getLogo } from '../utils/helpers';
 
 export default function DashboardScreen({ navigation }: any) {
@@ -38,6 +40,7 @@ export default function DashboardScreen({ navigation }: any) {
     const [exchangeStateIndex, setExchangeStateIndex] = useState(0);
 
     const [refreshing, setRefreshing] = useState(false);
+    const [isOffline, setIsOffline] = useState(false);
 
     const formatVNRate = (value: string) => {
         if (!value || value === '-' || value === '0' || value === '') return '-';
@@ -83,6 +86,7 @@ export default function DashboardScreen({ navigation }: any) {
             }).filter(Boolean);
 
             setGasList(processed);
+            await AsyncStorage.setItem('cache_dashboard_gas', JSON.stringify(processed));
         } catch (error) {
             console.log("Lỗi fetch xăng Dashboard:", error);
         } finally {
@@ -136,16 +140,17 @@ export default function DashboardScreen({ navigation }: any) {
                 };
             };
 
-            setDashboardGold([
+            const gData = [
                 formatGoldGroup('sjc', 'SJC', 'TP. Hồ Chí Minh', sjcList),
                 formatGoldGroup('doji', 'DOJI', 'Hà Nội', dojiList),
                 formatGoldGroup('pnj', 'PNJ', 'Hà Nội', pnjList)
-            ]);
+            ];
+            setDashboardGold(gData);
+            await AsyncStorage.setItem('cache_dashboard_gold', JSON.stringify(gData));
 
             if (resSilver && resSilver.data) {
                 const root = parse(resSilver.data);
                 const silverProducts: any[] = [];
-
                 const productNodes = root.querySelectorAll('.col-product');
 
                 productNodes.forEach(node => {
@@ -170,10 +175,12 @@ export default function DashboardScreen({ navigation }: any) {
                 });
 
                 if (silverProducts.length >= 4) {
-                    setDashboardSilver([
+                    const sData = [
                         { brandId: 'bac-phu-quy', brand: 'Bạc Phú Quý', region: 'Toàn quốc', item1: silverProducts[0], item2: silverProducts[1] },
                         { brandId: 'bac-phu-quy', brand: 'Bạc Phú Quý', region: 'Toàn quốc', item1: silverProducts[2], item2: silverProducts[3] }
-                    ]);
+                    ];
+                    setDashboardSilver(sData);
+                    await AsyncStorage.setItem('cache_dashboard_silver', JSON.stringify(sData));
                 }
             }
 
@@ -210,6 +217,7 @@ export default function DashboardScreen({ navigation }: any) {
 
             results.sort((a, b) => targetCodes.indexOf(a.code) - targetCodes.indexOf(b.code));
             setExchangeRates(results);
+            await AsyncStorage.setItem('cache_dashboard_exchange', JSON.stringify(results));
 
         } catch (error) {
             console.log("Lỗi fetch tỷ giá Dashboard:", error);
@@ -220,6 +228,24 @@ export default function DashboardScreen({ navigation }: any) {
 
     const loadAllData = async () => {
         setRefreshing(true);
+        const netState = await NetInfo.fetch();
+        if (!netState.isConnected) {
+            setIsOffline(true);
+            const cachedGas = await AsyncStorage.getItem('cache_dashboard_gas');
+            const cachedGold = await AsyncStorage.getItem('cache_dashboard_gold');
+            const cachedSilver = await AsyncStorage.getItem('cache_dashboard_silver');
+            const cachedEx = await AsyncStorage.getItem('cache_dashboard_exchange');
+
+            if (cachedGas) setGasList(JSON.parse(cachedGas));
+            if (cachedGold) setDashboardGold(JSON.parse(cachedGold));
+            if (cachedSilver) setDashboardSilver(JSON.parse(cachedSilver));
+            if (cachedEx) setExchangeRates(JSON.parse(cachedEx));
+
+            setLoadingGas(false); setLoadingMetal(false); setLoadingExchange(false); setRefreshing(false);
+            return;
+        }
+
+        setIsOffline(false);
         await Promise.all([fetchDashboardGas(), fetchMetals(), fetchDashboardExchange()]);
         setRefreshing(false);
     };
@@ -318,14 +344,25 @@ export default function DashboardScreen({ navigation }: any) {
         ? (dashboardGold[metalIndex] || dashboardGold[0])
         : (dashboardSilver[metalIndex] || dashboardSilver[0]);
 
+    const metalLogoUrl = getLogo(currentMetalData.brand) || (currentMetalData.brandId === 'bac-phu-quy' ? getLogo('Phú Quý') : null);
+
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
+            <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor="transparent" translucent={true} />
 
             <ScrollView
                 contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 115 }]}
                 showsVerticalScrollIndicator={false}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} progressViewOffset={insets.top + 115} />}
             >
+                {/* HIỂN THỊ CẢNH BÁO MẤT MẠNG */}
+                {isOffline && (
+                    <View style={styles.offlineBanner}>
+                        <WifiOff size={16} color="#FFF" style={{ marginRight: 6 }} />
+                        <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '700' }}>Đang ngoại tuyến. Hiển thị dữ liệu lưu tạm.</Text>
+                    </View>
+                )}
+
                 {/* --- KHỐI XĂNG DẦU --- */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
@@ -336,7 +373,7 @@ export default function DashboardScreen({ navigation }: any) {
                         </TouchableOpacity>
                     </View>
 
-                    {loadingGas ? (
+                    {loadingGas && !isOffline ? (
                         <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} />
                     ) : (
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
@@ -357,7 +394,6 @@ export default function DashboardScreen({ navigation }: any) {
                         </TouchableOpacity>
                     </View>
 
-                    {/* Bộ lọc Vàng / Bạc nhanh */}
                     <View style={styles.metalTabsWrapper}>
                         <TouchableOpacity
                             onPress={() => handleMetalTabChange('gold')}
@@ -377,12 +413,12 @@ export default function DashboardScreen({ navigation }: any) {
                     <TouchableOpacity
                         activeOpacity={0.9}
                         onPress={() => navigation.navigate('Gold', { activeBrand: currentMetalData?.brandId })}
-                        style={[styles.goldDashCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05 }]}
+                        style={[styles.goldDashCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05, overflow: 'hidden' }]}
                     >
-                        {loadingMetal ? (
+                        {loadingMetal && !isOffline ? (
                             <ActivityIndicator size="small" color="#F1C40F" style={{ marginVertical: 20 }} />
                         ) : (
-                            <Animated.View style={{ opacity: fadeAnim }}>
+                            <Animated.View style={{ opacity: fadeAnim, zIndex: 1 }}>
                                 <View style={styles.goldDashHeader}>
                                     <View style={[styles.iconBox, { backgroundColor: activeMetal === 'gold' ? '#F1C40F15' : '#bdc3c730', width: 40, height: 40, marginRight: 12 }]}>
                                         <Coins size={20} color={activeMetal === 'gold' ? "#F1C40F" : "#7f8c8d"} />
@@ -442,7 +478,7 @@ export default function DashboardScreen({ navigation }: any) {
                     </View>
 
                     <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05 }]}>
-                        {loadingExchange ? (
+                        {loadingExchange && !isOffline ? (
                             <ActivityIndicator size="small" color="#27AE60" style={{ marginVertical: 20 }} />
                         ) : (
                             <Animated.View style={{ opacity: fadeAnim }}>
@@ -534,6 +570,8 @@ export default function DashboardScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
+
+    offlineBanner: { backgroundColor: '#e74c3c', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, marginHorizontal: 16, borderRadius: 8, marginBottom: 12 },
 
     fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
     headerContent: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15 },

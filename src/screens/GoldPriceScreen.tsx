@@ -3,7 +3,9 @@ import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { parse } from 'node-html-parser';
-import { Coins, Info, ChevronDown, ChevronUp } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
+import { Coins, Info, ChevronDown, ChevronUp, WifiOff } from 'lucide-react-native';
 import { getLogo } from '../utils/helpers';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -30,6 +32,7 @@ export default function GoldPriceScreen({ route }: any) {
     const [lastUpdated, setLastUpdated] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [isOffline, setIsOffline] = useState(false);
 
     useEffect(() => {
         fetchMarketData(selectedSource);
@@ -47,16 +50,34 @@ export default function GoldPriceScreen({ route }: any) {
 
     const fetchMarketData = async (source: typeof MARKET_SOURCES[0]) => {
         setLoading(true);
+        const netState = await NetInfo.fetch();
+        if (!netState.isConnected) {
+            setIsOffline(true);
+            const cached = await AsyncStorage.getItem(`cache_metal_${source.id}`);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                setMarketData(parsed.data);
+                setLastUpdated(parsed.time);
+            } else {
+                setMarketData([]);
+            }
+            setLoading(false); setRefreshing(false);
+            return;
+        }
+
+        setIsOffline(false);
         try {
             const response = await axios.get(source.url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
             const root = parse(response.data);
             const groupedData: any[] = [];
             const rows = root.querySelectorAll('tr');
+            let updatedTime = '';
 
             if (source.type === 'silver') {
                 const timeNode = root.querySelector('.update-info-mobile');
                 if (timeNode) {
-                    setLastUpdated(timeNode.text.replace(/Cập nhật lần cuối[:\s]*/i, '').replace(/\s+/g, ' ').trim());
+                    updatedTime = timeNode.text.replace(/Cập nhật lần cuối[:\s]*/i, '').replace(/\s+/g, ' ').trim();
+                    setLastUpdated(updatedTime);
                 }
 
                 let brandGroup = { region: 'Bạc thương hiệu Phú Quý', items: [] as any[] };
@@ -93,7 +114,10 @@ export default function GoldPriceScreen({ route }: any) {
                     if (tds.length === 1 && tds[0].getAttribute('colspan')) {
                         const timeText = tds[0].text.trim();
                         const timeMatch = timeText.match(/Cập nhật lúc\s+([0-9:]+\s+[0-9/]+)/i);
-                        if (timeMatch) setLastUpdated(timeMatch[1]);
+                        if (timeMatch) {
+                            updatedTime = timeMatch[1];
+                            setLastUpdated(updatedTime);
+                        }
                         return;
                     }
 
@@ -135,7 +159,10 @@ export default function GoldPriceScreen({ route }: any) {
                 });
             }
 
-            setMarketData(groupedData.filter(g => g.items.length > 0));
+            const finalData = groupedData.filter(g => g.items.length > 0);
+            setMarketData(finalData);
+            await AsyncStorage.setItem(`cache_metal_${source.id}`, JSON.stringify({ data: finalData, time: updatedTime }));
+
         } catch (error) {
             setMarketData([]);
         } finally {
@@ -166,20 +193,22 @@ export default function GoldPriceScreen({ route }: any) {
 
         return (
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05 }]}>
-                <View style={[styles.cardHeader, { borderBottomColor: colors.border }]}>
+                {/* WATERMARK BACKGROUND */}
+                <View style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center', zIndex: 0 }]}>
+                    {logoUrl && <Image source={{ uri: logoUrl }} style={{ width: 140, height: 140, opacity: 0.05 }} resizeMode="contain" blurRadius={1.5} />}
+                </View>
+
+                {/* SỬ DỤNG ICON MẶC ĐỊNH (COINS) */}
+                <View style={[styles.cardHeader, { borderBottomColor: colors.border, zIndex: 1 }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        {logoUrl ? (
-                            <Image source={{ uri: logoUrl }} style={styles.logo} resizeMode="contain" />
-                        ) : (
-                            <View style={[styles.iconBox, { backgroundColor: selectedSource.type === 'silver' ? '#bdc3c730' : '#F1C40F15' }]}>
-                                <Coins size={18} color={selectedSource.type === 'silver' ? "#7f8c8d" : "#F1C40F"} />
-                            </View>
-                        )}
+                        <View style={[styles.iconBox, { backgroundColor: selectedSource.type === 'silver' ? '#bdc3c730' : '#F1C40F15' }]}>
+                            <Coins size={18} color={selectedSource.type === 'silver' ? "#7f8c8d" : "#F1C40F"} />
+                        </View>
                         <Text style={[styles.regionName, { color: colors.textPrimary }]}>{group.region}</Text>
                     </View>
                 </View>
 
-                <View style={styles.tableHeaderRow}>
+                <View style={[styles.tableHeaderRow, { zIndex: 1 }]}>
                     <Text style={[styles.colTitle, { flex: 2, color: colors.textSecondary }]}>Loại sản phẩm</Text>
                     <Text style={[styles.colPriceTitle, { color: colors.textSecondary }]}>Mua vào</Text>
                     <Text style={[styles.colPriceTitle, { color: colors.textSecondary }]}>Bán ra</Text>
@@ -188,7 +217,7 @@ export default function GoldPriceScreen({ route }: any) {
                 {visibleItems.map((gItem: any, idx: number) => {
                     const isLast = idx === visibleItems.length - 1;
                     return (
-                        <View key={idx} style={[styles.tableRow, !isLast && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
+                        <View key={idx} style={[styles.tableRow, !isLast && { borderBottomWidth: 1, borderBottomColor: colors.border }, { zIndex: 1 }]}>
                             <View style={{ flex: 2, paddingRight: 8 }}>
                                 <Text style={[styles.itemTitleText, { color: colors.textPrimary }]} numberOfLines={2}>
                                     {gItem.title}
@@ -211,7 +240,7 @@ export default function GoldPriceScreen({ route }: any) {
                 })}
 
                 {selectedSource.id === 'bac-phu-quy' && group.region === 'Bạc thương hiệu khác' && (
-                    <View style={{ padding: 12 }}>
+                    <View style={{ padding: 12, zIndex: 1 }}>
                         <Text style={{ fontSize: 11, color: colors.textSecondary, fontStyle: 'italic' }}>
                             Quý khách lưu ý: Bạc thương hiệu khác chỉ giao dịch tại Số 30 Trần Nhân Tông, Phường Hai Bà Trưng, TP Hà Nội, Việt Nam.
                         </Text>
@@ -219,7 +248,7 @@ export default function GoldPriceScreen({ route }: any) {
                 )}
 
                 {hasMore && (
-                    <TouchableOpacity onPress={toggleExpand} style={[styles.expandBtn, { borderTopColor: colors.border }]}>
+                    <TouchableOpacity onPress={toggleExpand} style={[styles.expandBtn, { borderTopColor: colors.border, zIndex: 1 }]}>
                         <Text style={[styles.expandText, { color: colors.primary }]}>
                             {isExpanded ? 'Thu gọn' : `Xem thêm ${group.items.length - maxVisible} loại`}
                         </Text>
@@ -267,16 +296,22 @@ export default function GoldPriceScreen({ route }: any) {
             </SafeAreaView>
 
             <View style={styles.infoSection}>
+                {isOffline && (
+                    <View style={styles.offlineBanner}>
+                        <WifiOff size={16} color="#FFF" style={{ marginRight: 6 }} />
+                        <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '700' }}>Ngoại tuyến. Dữ liệu lưu tạm.</Text>
+                    </View>
+                )}
                 <View style={styles.legendRow}>
                     <Info size={14} color={colors.textSecondary} />
                     <Text style={[styles.legendText, { color: colors.textSecondary }]}>
-                        Chú ý: Đơn vị tính được ghi chú ngay dưới mức giá.
+                        Chú ý: Đơn vị tính được ghi chú ngay dưới mức giá
                     </Text>
                 </View>
             </View>
 
             <View style={styles.body}>
-                {loading ? (
+                {loading && !isOffline ? (
                     <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
                 ) : (
                     <FlatList
@@ -305,6 +340,7 @@ const styles = StyleSheet.create({
     infoSection: { paddingHorizontal: 20, paddingBottom: 10 },
     legendRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     legendText: { fontSize: 12, fontStyle: 'italic' },
+    offlineBanner: { backgroundColor: '#e74c3c', flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, marginBottom: 8 },
     body: { flex: 1 },
     list: { paddingHorizontal: 16, paddingBottom: 20 },
     card: { borderRadius: 20, borderWidth: 1, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowRadius: 8, overflow: 'hidden' },
