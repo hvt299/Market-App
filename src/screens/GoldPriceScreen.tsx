@@ -35,6 +35,15 @@ export default function GoldPriceScreen({ route }: any) {
     const [isOffline, setIsOffline] = useState(false);
 
     useEffect(() => {
+        if (route.params?.activeBrand) {
+            const source = MARKET_SOURCES.find(s => s.id === route.params.activeBrand);
+            if (source) {
+                setSelectedSource(source);
+            }
+        }
+    }, [route.params?.activeBrand]);
+
+    useEffect(() => {
         fetchMarketData(selectedSource);
     }, [selectedSource]);
 

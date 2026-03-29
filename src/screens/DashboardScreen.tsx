@@ -41,6 +41,7 @@ export default function DashboardScreen({ navigation }: any) {
 
     const [refreshing, setRefreshing] = useState(false);
     const [isOffline, setIsOffline] = useState(false);
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
 
     const formatVNRate = (value: string) => {
         if (!value || value === '-' || value === '0' || value === '') return '-';
@@ -227,7 +228,7 @@ export default function DashboardScreen({ navigation }: any) {
     };
 
     const loadAllData = async () => {
-        setRefreshing(true);
+        if (!isInitialLoading) setRefreshing(true);
         const netState = await NetInfo.fetch();
         if (!netState.isConnected) {
             setIsOffline(true);
@@ -241,13 +242,16 @@ export default function DashboardScreen({ navigation }: any) {
             if (cachedSilver) setDashboardSilver(JSON.parse(cachedSilver));
             if (cachedEx) setExchangeRates(JSON.parse(cachedEx));
 
-            setLoadingGas(false); setLoadingMetal(false); setLoadingExchange(false); setRefreshing(false);
+            setLoadingGas(false); setLoadingMetal(false); setLoadingExchange(false);
+            setRefreshing(false);
+            setIsInitialLoading(false);
             return;
         }
 
         setIsOffline(false);
         await Promise.all([fetchDashboardGas(), fetchMetals(), fetchDashboardExchange()]);
         setRefreshing(false);
+        setIsInitialLoading(false);
     };
 
     useEffect(() => {
@@ -363,183 +367,182 @@ export default function DashboardScreen({ navigation }: any) {
                     </View>
                 )}
 
-                {/* --- KHỐI XĂNG DẦU --- */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Xăng dầu (Petrolimex)</Text>
-                        <TouchableOpacity onPress={() => navigation.navigate('Gas')} style={styles.seeAllBtn}>
-                            <Text style={[styles.seeAllText, { color: colors.primary }]}>Chi tiết</Text>
-                            <ChevronRight size={16} color={colors.primary} />
-                        </TouchableOpacity>
+                {/* LOADING TỔNG BAO TRÙM TẤT CẢ */}
+                {isInitialLoading ? (
+                    <View style={{ marginTop: 120, alignItems: 'center', justifyContent: 'center' }}>
+                        <ActivityIndicator size="large" color={colors.primary} />
+                        <Text style={{ marginTop: 16, color: colors.textSecondary, fontWeight: '600', fontSize: 15 }}>Đang tải thông tin thị trường...</Text>
                     </View>
+                ) : (
+                    <>
+                        {/* --- KHỐI XĂNG DẦU --- */}
+                        <View style={styles.section}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Xăng dầu (Petrolimex)</Text>
+                                <TouchableOpacity onPress={() => navigation.navigate('Gas')} style={styles.seeAllBtn}>
+                                    <Text style={[styles.seeAllText, { color: colors.primary }]}>Chi tiết</Text>
+                                    <ChevronRight size={16} color={colors.primary} />
+                                </TouchableOpacity>
+                            </View>
 
-                    {loadingGas && !isOffline ? (
-                        <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} />
-                    ) : (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
-                            {gasList.map((gas, index) => (
-                                <GasWidget key={index} data={gas} />
-                            ))}
-                        </ScrollView>
-                    )}
-                </View>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+                                {gasList.map((gas, index) => (
+                                    <GasWidget key={index} data={gas} />
+                                ))}
+                            </ScrollView>
+                        </View>
 
-                {/* --- KHỐI KIM LOẠI QUÝ (VÀNG / BẠC) --- */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Vàng bạc</Text>
-                        <TouchableOpacity onPress={() => navigation.navigate('Gold', { activeBrand: currentMetalData?.brandId })} style={styles.seeAllBtn}>
-                            <Text style={[styles.seeAllText, { color: colors.primary }]}>Chi tiết</Text>
-                            <ChevronRight size={16} color={colors.primary} />
-                        </TouchableOpacity>
-                    </View>
+                        {/* --- KHỐI KIM LOẠI QUÝ (VÀNG / BẠC) --- */}
+                        <View style={styles.section}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Vàng bạc</Text>
+                                <TouchableOpacity onPress={() => navigation.navigate('Gold', { activeBrand: currentMetalData?.brandId })} style={styles.seeAllBtn}>
+                                    <Text style={[styles.seeAllText, { color: colors.primary }]}>Chi tiết</Text>
+                                    <ChevronRight size={16} color={colors.primary} />
+                                </TouchableOpacity>
+                            </View>
 
-                    <View style={styles.metalTabsWrapper}>
-                        <TouchableOpacity
-                            onPress={() => handleMetalTabChange('gold')}
-                            style={[styles.metalTab, activeMetal === 'gold' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                        >
-                            <Text style={[styles.metalTabText, { color: activeMetal === 'gold' ? '#FFF' : colors.textSecondary }]}>Vàng</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => handleMetalTabChange('silver')}
-                            style={[styles.metalTab, activeMetal === 'silver' && { backgroundColor: '#7f8c8d', borderColor: '#7f8c8d' }]}
-                        >
-                            <Text style={[styles.metalTabText, { color: activeMetal === 'silver' ? '#FFF' : colors.textSecondary }]}>Bạc</Text>
-                        </TouchableOpacity>
-                        <Text style={[styles.noteText, { color: colors.textSecondary, flex: 1, textAlign: 'right' }]}>* Đơn vị tính tùy mặt hàng</Text>
-                    </View>
+                            <View style={styles.metalTabsWrapper}>
+                                <TouchableOpacity
+                                    onPress={() => handleMetalTabChange('gold')}
+                                    style={[styles.metalTab, activeMetal === 'gold' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                                >
+                                    <Text style={[styles.metalTabText, { color: activeMetal === 'gold' ? '#FFF' : colors.textSecondary }]}>Vàng</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() => handleMetalTabChange('silver')}
+                                    style={[styles.metalTab, activeMetal === 'silver' && { backgroundColor: '#7f8c8d', borderColor: '#7f8c8d' }]}
+                                >
+                                    <Text style={[styles.metalTabText, { color: activeMetal === 'silver' ? '#FFF' : colors.textSecondary }]}>Bạc</Text>
+                                </TouchableOpacity>
+                                <Text style={[styles.noteText, { color: colors.textSecondary, flex: 1, textAlign: 'right' }]}>* Đơn vị tính tùy mặt hàng</Text>
+                            </View>
 
-                    <TouchableOpacity
-                        activeOpacity={0.9}
-                        onPress={() => navigation.navigate('Gold', { activeBrand: currentMetalData?.brandId })}
-                        style={[styles.goldDashCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05, overflow: 'hidden' }]}
-                    >
-                        {loadingMetal && !isOffline ? (
-                            <ActivityIndicator size="small" color="#F1C40F" style={{ marginVertical: 20 }} />
-                        ) : (
-                            <Animated.View style={{ opacity: fadeAnim, zIndex: 1 }}>
-                                <View style={styles.goldDashHeader}>
-                                    <View style={[styles.iconBox, { backgroundColor: activeMetal === 'gold' ? '#F1C40F15' : '#bdc3c730', width: 40, height: 40, marginRight: 12 }]}>
-                                        <Coins size={20} color={activeMetal === 'gold' ? "#F1C40F" : "#7f8c8d"} />
-                                    </View>
-                                    <View>
-                                        <Text style={[styles.itemName, { color: colors.textPrimary, marginBottom: 2 }]}>{currentMetalData.brand}</Text>
-                                        <Text style={[styles.itemSub, { color: colors.textSecondary }]}>Khu vực: {currentMetalData.region}</Text>
-                                    </View>
-                                </View>
-
-                                <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-                                {/* Sản phẩm 1 */}
-                                <View style={styles.goldTypeRow}>
-                                    <Text style={[styles.goldTypeText, { color: colors.textPrimary }]}>{currentMetalData.item1?.title}</Text>
-                                    <View style={styles.goldPriceBlock}>
-                                        <View style={{ alignItems: 'flex-end' }}>
-                                            <Text style={[styles.subPrice, { color: colors.downColor }]}>{currentMetalData.item1?.buy}</Text>
-                                            <Text style={styles.unitSmall}>{currentMetalData.item1?.unit} mua</Text>
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                onPress={() => navigation.navigate('Gold', { activeBrand: currentMetalData?.brandId })}
+                                style={[styles.goldDashCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05 }]}
+                            >
+                                <Animated.View style={{ opacity: fadeAnim, zIndex: 1 }}>
+                                    <View style={styles.goldDashHeader}>
+                                        <View style={[styles.iconBox, { backgroundColor: activeMetal === 'gold' ? '#F1C40F15' : '#bdc3c730', width: 40, height: 40, marginRight: 12 }]}>
+                                            <Coins size={20} color={activeMetal === 'gold' ? "#F1C40F" : "#7f8c8d"} />
                                         </View>
-                                        <View style={{ width: 1, height: 20, backgroundColor: colors.border, marginHorizontal: 8 }} />
-                                        <View style={{ alignItems: 'flex-end' }}>
-                                            <Text style={[styles.itemPrice, { color: colors.upColor }]}>{currentMetalData.item1?.sell}</Text>
-                                            <Text style={styles.unitSmall}>{currentMetalData.item1?.unit} bán</Text>
+                                        <View>
+                                            <Text style={[styles.itemName, { color: colors.textPrimary, marginBottom: 2 }]}>{currentMetalData.brand}</Text>
+                                            <Text style={[styles.itemSub, { color: colors.textSecondary }]}>Khu vực: {currentMetalData.region}</Text>
                                         </View>
                                     </View>
-                                </View>
 
-                                {/* Sản phẩm 2 */}
-                                <View style={[styles.goldTypeRow, { marginTop: 14 }]}>
-                                    <Text style={[styles.goldTypeText, { color: colors.textPrimary }]}>{currentMetalData.item2?.title}</Text>
-                                    <View style={styles.goldPriceBlock}>
-                                        <View style={{ alignItems: 'flex-end' }}>
-                                            <Text style={[styles.subPrice, { color: colors.downColor }]}>{currentMetalData.item2?.buy}</Text>
-                                            <Text style={styles.unitSmall}>{currentMetalData.item2?.unit} mua</Text>
-                                        </View>
-                                        <View style={{ width: 1, height: 20, backgroundColor: colors.border, marginHorizontal: 8 }} />
-                                        <View style={{ alignItems: 'flex-end' }}>
-                                            <Text style={[styles.itemPrice, { color: colors.upColor }]}>{currentMetalData.item2?.sell}</Text>
-                                            <Text style={styles.unitSmall}>{currentMetalData.item2?.unit} bán</Text>
-                                        </View>
-                                    </View>
-                                </View>
-                            </Animated.View>
-                        )}
-                    </TouchableOpacity>
-                </View>
+                                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-                {/* --- KHỐI TỶ GIÁ --- */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Tỷ giá (Vietcombank)</Text>
-                        <TouchableOpacity onPress={() => navigation.navigate('Exchange')} style={styles.seeAllBtn}>
-                            <Text style={[styles.seeAllText, { color: colors.primary }]}>Chi tiết</Text>
-                            <ChevronRight size={16} color={colors.primary} />
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05 }]}>
-                        {loadingExchange && !isOffline ? (
-                            <ActivityIndicator size="small" color="#27AE60" style={{ marginVertical: 20 }} />
-                        ) : (
-                            <Animated.View style={{ opacity: fadeAnim }}>
-                                {exchangeRates.map((rate, index) => {
-                                    const cleanCode = rate.code.split('(')[0].trim();
-                                    const countryCode = cleanCode.length >= 2 ? cleanCode.substring(0, 2) : 'UN';
-                                    const flagUrl = getLogo(cleanCode) || `https://flagsapi.com/${countryCode}/flat/64.png`;
-
-                                    const isLast = index === exchangeRates.length - 1;
-                                    const iconBgColors = ['#27AE6015', '#2980b915', '#8e44ad15', '#e67e2215', '#e74c3c15'];
-
-                                    let currentPrice = '';
-                                    let currentLabel = '';
-                                    let priceColor = colors.textPrimary;
-
-                                    if (exchangeStateIndex === 0) {
-                                        currentPrice = formatVNRate(rate.buyCash);
-                                        currentLabel = 'Mua TM';
-                                        priceColor = colors.downColor;
-                                    } else if (exchangeStateIndex === 1) {
-                                        currentPrice = formatVNRate(rate.sellCash);
-                                        currentLabel = 'Bán TM';
-                                        priceColor = colors.upColor;
-                                    } else if (exchangeStateIndex === 2) {
-                                        currentPrice = formatVNRate(rate.buyTransfer);
-                                        currentLabel = 'Mua CK';
-                                        priceColor = colors.downColor;
-                                    } else if (exchangeStateIndex === 3) {
-                                        currentPrice = formatVNRate(rate.sellTransfer);
-                                        currentLabel = 'Bán CK';
-                                        priceColor = colors.upColor;
-                                    }
-
-                                    return (
-                                        <React.Fragment key={rate.code}>
-                                            <View style={styles.listRow}>
-                                                <View style={styles.listRowLeft}>
-                                                    <View style={[styles.iconBox, { backgroundColor: iconBgColors[index % 5] }]}>
-                                                        <Image source={{ uri: flagUrl }} style={{ width: 28, height: 28, borderRadius: 14 }} resizeMode="cover" />
-                                                    </View>
-                                                    <View>
-                                                        <Text style={[styles.itemName, { color: colors.textPrimary }]}>{rate.code}</Text>
-                                                        <Text style={[styles.itemSub, { color: colors.textSecondary }]}>{rate.name}</Text>
-                                                    </View>
-                                                </View>
-                                                <View style={{ alignItems: 'flex-end' }}>
-                                                    <Text style={[styles.itemPrice, { color: priceColor }]}>
-                                                        {currentPrice} {currentPrice !== '-' && <Text style={styles.unit}>đ</Text>}
-                                                    </Text>
-                                                    <Text style={[styles.gasTrend, { color: colors.textSecondary }]}>{currentLabel}</Text>
-                                                </View>
+                                    <View style={styles.goldTypeRow}>
+                                        <Text style={[styles.goldTypeText, { color: colors.textPrimary }]}>{currentMetalData.item1?.title}</Text>
+                                        <View style={styles.goldPriceBlock}>
+                                            <View style={{ alignItems: 'flex-end' }}>
+                                                <Text style={[styles.subPrice, { color: colors.downColor }]}>{currentMetalData.item1?.buy}</Text>
+                                                <Text style={styles.unitSmall}>{currentMetalData.item1?.unit} mua</Text>
                                             </View>
-                                            {!isLast && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
-                                        </React.Fragment>
-                                    );
-                                })}
-                            </Animated.View>
-                        )}
-                    </View>
-                </View>
+                                            <View style={{ width: 1, height: 20, backgroundColor: colors.border, marginHorizontal: 8 }} />
+                                            <View style={{ alignItems: 'flex-end' }}>
+                                                <Text style={[styles.itemPrice, { color: colors.upColor }]}>{currentMetalData.item1?.sell}</Text>
+                                                <Text style={styles.unitSmall}>{currentMetalData.item1?.unit} bán</Text>
+                                            </View>
+                                        </View>
+                                    </View>
 
+                                    <View style={[styles.goldTypeRow, { marginTop: 14 }]}>
+                                        <Text style={[styles.goldTypeText, { color: colors.textPrimary }]}>{currentMetalData.item2?.title}</Text>
+                                        <View style={styles.goldPriceBlock}>
+                                            <View style={{ alignItems: 'flex-end' }}>
+                                                <Text style={[styles.subPrice, { color: colors.downColor }]}>{currentMetalData.item2?.buy}</Text>
+                                                <Text style={styles.unitSmall}>{currentMetalData.item2?.unit} mua</Text>
+                                            </View>
+                                            <View style={{ width: 1, height: 20, backgroundColor: colors.border, marginHorizontal: 8 }} />
+                                            <View style={{ alignItems: 'flex-end' }}>
+                                                <Text style={[styles.itemPrice, { color: colors.upColor }]}>{currentMetalData.item2?.sell}</Text>
+                                                <Text style={styles.unitSmall}>{currentMetalData.item2?.unit} bán</Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                </Animated.View>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* --- KHỐI TỶ GIÁ --- */}
+                        <View style={styles.section}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Tỷ giá (Vietcombank)</Text>
+                                <TouchableOpacity onPress={() => navigation.navigate('Exchange', { activeBank: 'vcb' })} style={styles.seeAllBtn}>
+                                    <Text style={[styles.seeAllText, { color: colors.primary }]}>Chi tiết</Text>
+                                    <ChevronRight size={16} color={colors.primary} />
+                                </TouchableOpacity>
+                            </View>
+
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                onPress={() => navigation.navigate('Exchange', { activeBank: 'vcb' })}
+                                style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05 }]}
+                            >
+                                <Animated.View style={{ opacity: fadeAnim }}>
+                                    {exchangeRates.map((rate, index) => {
+                                        const cleanCode = rate.code.split('(')[0].trim();
+                                        const countryCode = cleanCode.length >= 2 ? cleanCode.substring(0, 2) : 'UN';
+                                        const flagUrl = getLogo(cleanCode) || `https://flagsapi.com/${countryCode}/flat/64.png`;
+
+                                        const isLast = index === exchangeRates.length - 1;
+                                        const iconBgColors = ['#27AE6015', '#2980b915', '#8e44ad15', '#e67e2215', '#e74c3c15'];
+
+                                        let currentPrice = '';
+                                        let currentLabel = '';
+                                        let priceColor = colors.textPrimary;
+
+                                        if (exchangeStateIndex === 0) {
+                                            currentPrice = formatVNRate(rate.buyCash);
+                                            currentLabel = 'Mua TM';
+                                            priceColor = colors.downColor;
+                                        } else if (exchangeStateIndex === 1) {
+                                            currentPrice = formatVNRate(rate.sellCash);
+                                            currentLabel = 'Bán TM';
+                                            priceColor = colors.upColor;
+                                        } else if (exchangeStateIndex === 2) {
+                                            currentPrice = formatVNRate(rate.buyTransfer);
+                                            currentLabel = 'Mua CK';
+                                            priceColor = colors.downColor;
+                                        } else if (exchangeStateIndex === 3) {
+                                            currentPrice = formatVNRate(rate.sellTransfer);
+                                            currentLabel = 'Bán CK';
+                                            priceColor = colors.upColor;
+                                        }
+
+                                        return (
+                                            <React.Fragment key={rate.code}>
+                                                <View style={styles.listRow}>
+                                                    <View style={styles.listRowLeft}>
+                                                        <View style={[styles.iconBox, { backgroundColor: iconBgColors[index % 5] }]}>
+                                                            <Image source={{ uri: flagUrl }} style={{ width: 28, height: 28, borderRadius: 14 }} resizeMode="cover" />
+                                                        </View>
+                                                        <View>
+                                                            <Text style={[styles.itemName, { color: colors.textPrimary }]}>{rate.code}</Text>
+                                                            <Text style={[styles.itemSub, { color: colors.textSecondary }]}>{rate.name}</Text>
+                                                        </View>
+                                                    </View>
+                                                    <View style={{ alignItems: 'flex-end' }}>
+                                                        <Text style={[styles.itemPrice, { color: priceColor }]}>
+                                                            {currentPrice} {currentPrice !== '-' && <Text style={styles.unit}>đ</Text>}
+                                                        </Text>
+                                                        <Text style={[styles.gasTrend, { color: colors.textSecondary }]}>{currentLabel}</Text>
+                                                    </View>
+                                                </View>
+                                                {!isLast && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                </Animated.View>
+                            </TouchableOpacity>
+                        </View>
+                    </>
+                )}
             </ScrollView>
 
             <BlurView

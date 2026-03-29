@@ -32,7 +32,7 @@ const CURRENCY_NAMES: Record<string, string> = {
     'PHP': 'PHILIPPINE PESO', 'HUF': 'HUNGARIAN FORINT', 'LAK': 'LAO KIP'
 };
 
-export default function ExchangeRateScreen() {
+export default function ExchangeRateScreen({ route, navigation }: any) {
     const { colors, isDarkMode } = useTheme();
     const [selectedBank, setSelectedBank] = useState(EXCHANGE_SOURCES[0]);
     const [rates, setRates] = useState<any[]>([]);
@@ -41,6 +41,15 @@ export default function ExchangeRateScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [isMaintenance, setIsMaintenance] = useState(false);
     const [isOffline, setIsOffline] = useState(false);
+
+    useEffect(() => {
+        if (route?.params?.activeBank) {
+            const bank = EXCHANGE_SOURCES.find(b => b.id === route.params.activeBank);
+            if (bank) {
+                setSelectedBank(bank);
+            }
+        }
+    }, [route?.params?.activeBank]);
 
     useEffect(() => {
         fetchExchangeRates(selectedBank);
