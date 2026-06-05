@@ -29,25 +29,35 @@ export const getTrendColor = (type: 'up' | 'down' | 'neutral') => {
     }
 };
 
+export const getFuelColor = (title: string, defaultColor: string) => {
+    const t = title.toUpperCase();
+    if (t.includes('RON 95-V')) return '#e74c3c';
+    if (t.includes('RON 95-III')) return '#e67e22';
+    if (t.includes('E5 RON 92-II')) return '#27AE60';
+    if (t.includes('E10 RON 95-III')) return '#f39c12';
+    if (t.includes('DO') || t.includes('DẦU') || t.includes('KO')) return '#3498db';
+    return defaultColor;
+};
+
 export const getLogo = (code: string) => {
     const map: Record<string, string> = {
         'Petrolimex': 'https://files.petrolimex.com.vn/thumbnailwebps/9a04b7cf9aaf4656a407ff8652dcfdf7/0/0/0/626286bfb2794d9f9ff49efeaebf8955/0/2026/1944721000402/petrolimex-gioi-thieu-nhan-dien-thuong-hieu-moi-san-sang-cung-dat-nuoc-tien-vao-ky-nguyen-moi.webp',
         'Pvoil': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRk0NxnE48QLQDzhgOLC7cyrzu6BazbProGNped_eYRHoIZhXFEKi-vYPSBnzs2EtDB4bw&usqp=CAU',
-        'SJC': 'https://sjc.com.vn/Data/Sites/1/media/img/logo.png',
+        'SJC': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT6K0BZVvz93geE3_wiXyWzZV8JPRIP8iSwsA&s',
         'DOJI': 'https://ibrand.vn/wp-content/uploads/2024/09/16350118_LOGO-DOJI.png',
         'PNJ': 'https://cdn.pnj.io/images/logo/pnj.com.vn.png',
         'Bảo Tín Minh Châu': 'https://btmc.vn/favicon.ico',
         'Bảo Tín Mạnh Hải': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQEhxpVShRWtLfiQkFfROar90kT0x_t5g_vAw&s',
-        'Phú Quý': 'https://phuquygroup.vn/favicon.ico',
+        'Phú Quý': 'https://cdn1.vieclam24h.vn/upload/files_cua_nguoi_dung/logo/2020/02/06/1881626_vieclam24h_1580975398.png',
         'Mi Hồng': 'https://www.mihong.vn/assets/images/logos/logo-desktop.png',
         'Ngọc Thẩm': 'https://hvnclc.vn/wp-content/uploads/2021/06/Ng%E1%BB%8Dc-Th%E1%BA%A9m-Jewelry-Logo.jpg',
-        'VCB': 'https://cdn.haitrieu.com/wp-content/uploads/2022/02/Icon-Vietcombank.png',
-        'BIDV': 'https://upload.wikimedia.org/wikipedia/commons/6/69/Logo_BIDV.png',
-        'AGRI': 'https://upload.wikimedia.org/wikipedia/commons/a/a8/Logo_Agribank.png',
-        'HDB': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/HDBank_logo.svg/2560px-HDBank_logo.svg.png',
-        'TPB': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Logo_TPBank.svg/2560px-Logo_TPBank.svg.png',
-        'NHNN': 'https://upload.wikimedia.org/wikipedia/vi/a/a2/Logo_Ng%C3%A2n_h%C3%A0ng_Nh%C3%A0_n%C6%B0%E1%BB%9Bc_Vi%E1%BB%87t_Nam.png',
-        'USD': 'https://flagsapi.com/US/flat/64.png',
+        'VCB': 'https://cdn.tgdd.vn/2020/04/GameApp/icon-200x200.jpg',
+        'BIDV': 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/Logo_Bidv_m%E1%BB%9Bi.svg/3840px-Logo_Bidv_m%E1%BB%9Bi.svg.png',
+        'AGRI': 'https://play-lh.googleusercontent.com/rNSXUqGnK-ljK6qUdUmy7h_sDrMOzZ1nPwAUAwshsmPaQuwNGn0Xwj-psgFrBSJOHg',
+        'HDB': 'https://hdbank.com.vn/favicon.ico',
+        'TPB': 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Logo-TPB.png',
+        'NHNN': 'https://sbv.gov.vn/documents/20117/32829/logo-nhnnvn-favicon.png/7c6d31ad-f40a-06ba-459e-030f95935ae5',
+        'EUR': 'https://aimsvietnam.com/wp-content/uploads/eu-la-gi-aims-viet-nam-1.png',
     };
     return map[code] || null;
 };
