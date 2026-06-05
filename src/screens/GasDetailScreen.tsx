@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, StatusBar, Image, Animated, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, Fuel, CalendarDays, TrendingUp, TrendingDown, Minus, ChevronDown } from 'lucide-react-native';
+import { ChevronLeft, Fuel, CalendarDays, TrendingUp, TrendingDown, Minus, ChevronDown, Droplet } from 'lucide-react-native';
 import axios from 'axios';
 import { BlurView } from 'expo-blur';
-import { getPreviousDay, formatCurrency, getLogo } from '../utils/helpers';
+import { getPreviousDay, formatCurrency, getLogo, getFuelColor } from '../utils/helpers';
 import { useTheme } from '../theme/ThemeContext';
 
 export default function GasDetailScreen({ route, navigation }: any) {
@@ -93,7 +93,7 @@ export default function GasDetailScreen({ route, navigation }: any) {
                         effectiveDate = prevDate;
                     }
                 }
-            } catch (error) {}
+            } catch (error) { }
             await new Promise(resolve => setTimeout(resolve, 100));
             searchDate = prevDate;
             attempts++;
@@ -126,6 +126,8 @@ export default function GasDetailScreen({ route, navigation }: any) {
         return <Minus size={size} color={colors.textSecondary} />;
     };
 
+    const fuelColor = getFuelColor(gasItem.title, colors.primary);
+
     const scrollRef = useRef<ScrollView>(null);
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
@@ -151,7 +153,6 @@ export default function GasDetailScreen({ route, navigation }: any) {
                     )}
                 </View>
 
-                {/* FIX LỆCH TRÁI: Dùng contentContainerStyle với flexGrow và justifyContent center */}
                 <ScrollView
                     horizontal
                     ref={scrollRef}
@@ -185,7 +186,6 @@ export default function GasDetailScreen({ route, navigation }: any) {
 
                                     <Pressable onPress={() => setSelectedIndex(selectedIndex === index ? null : index)}>
                                         <View style={styles.barGroup}>
-                                            {/* Cột Vùng 2 (Nằm phía sau, nhô cao hơn 6px) */}
                                             {isPetrolimex && (
                                                 <Animated.View
                                                     style={[
@@ -199,7 +199,6 @@ export default function GasDetailScreen({ route, navigation }: any) {
                                                     ]}
                                                 />
                                             )}
-                                            {/* Cột Vùng 1 (Nằm đè lên trước) */}
                                             <Animated.View
                                                 style={[
                                                     styles.barFill,
@@ -214,7 +213,6 @@ export default function GasDetailScreen({ route, navigation }: any) {
                                         </View>
                                     </Pressable>
 
-                                    {/* Tooltip khi bấm vào cột */}
                                     {selectedIndex === index && (
                                         <View style={[styles.tooltip, { backgroundColor: isDarkMode ? '#333' : '#FFF', borderColor: colors.border }]}>
                                             <Text style={{ color: colors.textPrimary, fontSize: 11, fontWeight: 'bold' }}>
@@ -241,24 +239,26 @@ export default function GasDetailScreen({ route, navigation }: any) {
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
+            <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
 
             <ScrollView contentContainerStyle={{ paddingBottom: 60, paddingTop: insets.top + 60 }} showsVerticalScrollIndicator={false}>
 
-                <View style={[styles.overviewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <View style={[styles.iconBox, { backgroundColor: `${colors.primary}15` }]}>
-                        {logoUrl ? (
-                            <Image source={{ uri: logoUrl }} style={{ width: 40, height: 40 }} resizeMode="contain" />
-                        ) : (
-                            <Fuel size={32} color={colors.primary} />
-                        )}
+                <View style={[styles.overviewCard, { backgroundColor: colors.surface, borderColor: colors.border, overflow: 'hidden' }]}>
+                    {/* WATERMARK BACKGROUND */}
+                    <View style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center', zIndex: 0 }]}>
+                        {logoUrl && <Image source={{ uri: logoUrl }} style={{ width: 160, height: 160, opacity: 0.05 }} resizeMode="contain" blurRadius={1.5} />}
                     </View>
-                    <Text style={[styles.gasName, { color: colors.textPrimary }]}>{displayTitle}</Text>
-                    <Text style={[styles.providerName, { color: colors.textSecondary }]}>{provider}</Text>
 
-                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                    {/* SỬA LOGO THÀNH ICON GIỌT NƯỚC MẶC ĐỊNH */}
+                    <View style={[styles.iconBox, { backgroundColor: `${fuelColor}15`, zIndex: 1 }]}>
+                        <Droplet size={32} color={fuelColor} />
+                    </View>
+                    <Text style={[styles.gasName, { color: colors.textPrimary, zIndex: 1 }]}>{displayTitle}</Text>
+                    <Text style={[styles.providerName, { color: colors.textSecondary, zIndex: 1 }]}>{provider}</Text>
 
-                    <View style={styles.priceOverviewRow}>
+                    <View style={[styles.divider, { backgroundColor: colors.border, zIndex: 1 }]} />
+
+                    <View style={[styles.priceOverviewRow, { zIndex: 1 }]}>
                         <View style={styles.priceBlock}>
                             <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>VÙNG 1</Text>
                             <Text style={[styles.bigPrice, { color: colors.textPrimary }]}>{formatCurrency(isPetrolimex ? gasItem.zone1_price : gasItem.price)} đ</Text>

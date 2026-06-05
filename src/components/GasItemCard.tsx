@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Fuel, TrendingUp, TrendingDown, Minus } from 'lucide-react-native';
-import { formatCurrency, getLogo } from '../utils/helpers';
+import { Fuel, TrendingUp, TrendingDown, Minus, Droplet } from 'lucide-react-native';
+import { formatCurrency, getFuelColor, getLogo } from '../utils/helpers';
 import { useTheme } from '../theme/ThemeContext';
 
 interface GasItemCardProps {
@@ -16,6 +16,8 @@ export const GasItemCard: React.FC<GasItemCardProps> = ({ item, providerId, onPr
 
     const isPvoil = providerId.toLowerCase() === 'pvoil';
     const displayTitle = item.title.replace(/^Xăng\s+/i, '');
+
+    const fuelColor = getFuelColor(item.title, colors.primary);
 
     const renderTrendBadge = (change: number, isSmall = false) => {
         if (change === undefined || change === 0) return null;
@@ -46,26 +48,30 @@ export const GasItemCard: React.FC<GasItemCardProps> = ({ item, providerId, onPr
                 {
                     backgroundColor: colors.surface,
                     borderColor: colors.border,
-                    shadowOpacity: isDarkMode ? 0 : 0.05
+                    shadowOpacity: isDarkMode ? 0 : 0.05,
+                    overflow: 'hidden'
                 }
             ]}
         >
-            <View style={styles.leftContent}>
-                {logoUrl ? (
-                    <Image source={{ uri: logoUrl }} style={styles.logo} resizeMode="contain" />
-                ) : (
-                    <View style={[styles.logoPlaceholder, { backgroundColor: colors.border }]}>
-                        <Fuel size={20} color={colors.textPrimary} />
-                    </View>
-                )}
+            {/* 1. WATERMARK */}
+            <View style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center', zIndex: 0 }]}>
+                {logoUrl && <Image source={{ uri: logoUrl }} style={{ width: 120, height: 120, opacity: 0.05 }} resizeMode="contain" blurRadius={1.5} />}
+            </View>
+
+            {/* 2. LEFTCONTENT */}
+            <View style={[styles.leftContent, { zIndex: 1 }]}>
+                <View style={[styles.iconBox, { backgroundColor: `${fuelColor}15` }]}>
+                    <Droplet size={20} color={fuelColor} />
+                </View>
                 <Text style={[styles.itemName, { color: colors.textPrimary }]} numberOfLines={2}>
                     {displayTitle}
                 </Text>
             </View>
 
-            <View style={[styles.verticalDivider, { backgroundColor: colors.border }]} />
+            {/* 3. BỔ SUNG zIndex: 1 CHO DIVIDER VÀ RIGHTCONTENT KẺO BỊ MỜ */}
+            <View style={[styles.verticalDivider, { backgroundColor: colors.border, zIndex: 1 }]} />
 
-            <View style={styles.rightContent}>
+            <View style={[styles.rightContent, { zIndex: 1 }]}>
                 {isPvoil ? (
                     <View style={styles.priceRow}>
                         {renderTrendBadge(item.change1)}
@@ -99,8 +105,7 @@ export const GasItemCard: React.FC<GasItemCardProps> = ({ item, providerId, onPr
 const styles = StyleSheet.create({
     card: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 20, borderWidth: 1, marginBottom: 12, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowRadius: 8 },
     leftContent: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-    logo: { width: 36, height: 36, marginRight: 12 },
-    logoPlaceholder: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+    iconBox: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
     itemName: { fontSize: 16, fontWeight: '700', flex: 1, lineHeight: 22 },
     verticalDivider: { width: 1, height: '80%', marginHorizontal: 16 },
     rightContent: { alignItems: 'flex-end', justifyContent: 'center', minWidth: 85 },

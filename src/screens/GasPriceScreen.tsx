@@ -3,7 +3,8 @@ import { StyleSheet, Text, View, FlatList, ActivityIndicator, StatusBar, Refresh
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import NetInfo from '@react-native-community/netinfo';
-import { Search, SlidersHorizontal, Info, CircleHelp, X } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Search, SlidersHorizontal, Info, CircleHelp, X, WifiOff } from 'lucide-react-native';
 
 import { GasItemCard } from '../components/GasItemCard';
 import { ZoneModal } from '../components/ZoneModal';
@@ -24,6 +25,7 @@ export default function GasPriceScreen({ navigation }: any) {
     const [lastUpdated, setLastUpdated] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [isOffline, setIsOffline] = useState(false);
 
     const [selectedProvider, setSelectedProvider] = useState(PROVIDERS[0]);
     const [selectedFilter, setSelectedFilter] = useState(FILTERS[0]);
@@ -44,11 +46,18 @@ export default function GasPriceScreen({ navigation }: any) {
     const fetchGasPrices = async (dateStr?: string) => {
         const netState = await NetInfo.fetch();
         if (!netState.isConnected) {
+            setIsOffline(true);
+            const cached = await AsyncStorage.getItem('cache_gas_latest');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                setRawData(parsed);
+                processDataForProvider(parsed, selectedProvider.id);
+            }
             setLoading(false); setRefreshing(false);
-            Alert.alert("Mất kết nối", "Vui lòng kiểm tra lại đường truyền internet.");
             return;
         }
 
+        setIsOffline(false);
         try {
             let targetDate = dateStr || new Date().toISOString().substring(0, 10);
             const apiUrl = `https://giaxanghomnay.com/api/pvdate/${targetDate}`;
@@ -57,6 +66,7 @@ export default function GasPriceScreen({ navigation }: any) {
             if (Array.isArray(response.data) && response.data.length >= 2) {
                 setRawData(response.data);
                 processDataForProvider(response.data, selectedProvider.id);
+                await AsyncStorage.setItem('cache_gas_latest', JSON.stringify(response.data));
             } else {
                 const yesterday = getPreviousDay(targetDate);
                 if (dateStr !== yesterday) {
@@ -186,6 +196,12 @@ export default function GasPriceScreen({ navigation }: any) {
             </SafeAreaView>
 
             <View style={styles.infoSection}>
+                {isOffline && (
+                    <View style={styles.offlineBanner}>
+                        <WifiOff size={16} color="#FFF" style={{ marginRight: 6 }} />
+                        <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '700' }}>Ngoại tuyến. Dữ liệu lưu tạm.</Text>
+                    </View>
+                )}
                 <View style={styles.legendRow}>
                     <Info size={14} color={colors.textSecondary} />
                     <Text style={[styles.legendText, { color: colors.textSecondary }]}>
@@ -195,7 +211,7 @@ export default function GasPriceScreen({ navigation }: any) {
             </View>
 
             <View style={styles.body}>
-                {loading ? (
+                {loading && !isOffline ? (
                     <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
                 ) : (
                     <FlatList
@@ -211,10 +227,8 @@ export default function GasPriceScreen({ navigation }: any) {
                 )}
             </View>
 
-            {/* --- MODAL CHÚ THÍCH VÙNG 2 --- */}
             <ZoneModal visible={modalVisible} onClose={() => setModalVisible(false)} />
 
-            {/* --- MODAL BỘ LỌC (Sử dụng State Tạm) --- */}
             <Modal visible={filterModalVisible} transparent animationType="fade" statusBarTranslucent>
                 <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setFilterModalVisible(false)}>
                     <TouchableOpacity activeOpacity={1} style={[styles.filterModalContent, { backgroundColor: colors.surface }]}>
@@ -277,7 +291,8 @@ const styles = StyleSheet.create({
 
     infoSection: { paddingHorizontal: 20, paddingBottom: 10 },
     legendRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    legendText: { fontSize: 12 },
+    legendText: { fontSize: 12, fontStyle: 'italic' },
+    offlineBanner: { backgroundColor: '#e74c3c', flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, marginBottom: 8 },
 
     body: { flex: 1 },
     list: { paddingHorizontal: 16, paddingBottom: 20 },
