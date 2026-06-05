@@ -74,8 +74,8 @@ export default function DashboardScreen({ navigation }: any) {
             const newGasData = newGasRes.data?.Objects || [];
             const yesterdayData = oldResponse.data[2] || [];
 
-            const targetKeywords = ['E5 RON 92-II', 'E10 RON 95-III'];
-            const widgetColors = ['#27AE60', '#f39c12'];
+            const targetKeywords = ['E10 RON 95-V', 'E10 RON 95-III', 'E5 RON 92-II'];
+            const widgetColors = ['#e74c3c', '#f39c12', '#27AE60'];
 
             const processedFuel = targetKeywords.map((keyword, index) => {
                 const item = newFuelData.find((i: any) => i.Title.includes(keyword));

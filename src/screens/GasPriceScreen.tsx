@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Search, SlidersHorizontal, Info, CircleHelp, X, WifiOff } from 'lucide-react-native';
 
 import { GasItemCard } from '../components/GasItemCard';
-import { ZoneModal } from '../components/ZoneModal';
+import { ReferenceModal } from '../components/ReferenceModal';
 import { getPreviousDay, formatDate } from '../utils/helpers';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -120,6 +120,20 @@ export default function GasPriceScreen({ navigation }: any) {
                         isGas: false,
                         date: item.LastModified || targetDate
                     };
+                })
+                .sort((a: any, b: any) => {
+                    const order = [
+                        'Xăng E10 RON 95-V',
+                        'Xăng E10 RON 95-III',
+                        'Xăng E5 RON 92-II'
+                    ];
+                    const idxA = order.indexOf(a.title);
+                    const idxB = order.indexOf(b.title);
+
+                    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                    if (idxA !== -1) return -1;
+                    if (idxB !== -1) return 1;
+                    return 0;
                 });
 
             const gasItems = newGas.map((item: any) => ({
@@ -130,7 +144,23 @@ export default function GasPriceScreen({ navigation }: any) {
                 change2: 0,
                 isGas: true,
                 date: item.LastModified || targetDate
-            }));
+            }))
+                .sort((a: any, b: any) => {
+                    const order = [
+                        'Gas Petrolimex - Hà Nội',
+                        'Gas Petrolimex - Hải Phòng',
+                        'Gas Petrolimex - Đà Nẵng',
+                        'Gas Petrolimex - Hồ Chí Minh',
+                        'Gas Petrolimex - Cần Thơ'
+                    ];
+                    const idxA = order.indexOf(a.title);
+                    const idxB = order.indexOf(b.title);
+
+                    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                    if (idxA !== -1) return -1;
+                    if (idxB !== -1) return 1;
+                    return 0;
+                });
 
             const combined = [...fuelItems, ...gasItems];
             setGasData(combined);
@@ -217,11 +247,9 @@ export default function GasPriceScreen({ navigation }: any) {
                                 : `Cập nhật: ${lastUpdatedFuel}`}
                         </Text>
                     </View>
-                    {selectedProvider.id === 'Petrolimex' && (
-                        <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.helpBtn}>
-                            <CircleHelp size={24} color={colors.textPrimary} />
-                        </TouchableOpacity>
-                    )}
+                    <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.helpBtn}>
+                        <CircleHelp size={24} color={colors.textPrimary} />
+                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.searchWrapper}>
@@ -276,7 +304,7 @@ export default function GasPriceScreen({ navigation }: any) {
                 )}
             </View>
 
-            <ZoneModal visible={modalVisible} onClose={() => setModalVisible(false)} />
+            <ReferenceModal visible={modalVisible} onClose={() => setModalVisible(false)} />
 
             <Modal visible={filterModalVisible} transparent animationType="fade" statusBarTranslucent>
                 <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setFilterModalVisible(false)}>
