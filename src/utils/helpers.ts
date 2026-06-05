@@ -35,7 +35,8 @@ export const getFuelColor = (title: string, defaultColor: string) => {
     if (t.includes('RON 95-III')) return '#e67e22';
     if (t.includes('E5 RON 92-II')) return '#27AE60';
     if (t.includes('E10 RON 95-III')) return '#f39c12';
-    if (t.includes('DO') || t.includes('DẦU') || t.includes('KO')) return '#3498db';
+    if (t.includes('DO') || t.includes('DẦU') || t.includes('KO') || t.includes('MAZUT')) return '#3498db';
+    if (t.includes('GAS') || t.includes('BÌNH')) return '#9b59b6';
     return defaultColor;
 };
 

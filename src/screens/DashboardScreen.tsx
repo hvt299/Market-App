@@ -7,8 +7,8 @@ import { parse } from 'node-html-parser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { useTheme } from '../theme/ThemeContext';
-import { Droplet, Coins, Banknote, ChevronRight, TrendingUp, TrendingDown, Minus, WifiOff } from 'lucide-react-native';
-import { getPreviousDay, formatCurrency, getLogo } from '../utils/helpers';
+import { Droplet, Coins, ChevronRight, TrendingUp, TrendingDown, Minus, WifiOff } from 'lucide-react-native';
+import { getPreviousDay, formatCurrency, getLogo, getFuelColor } from '../utils/helpers';
 
 export default function DashboardScreen({ navigation }: any) {
     const { colors, isDarkMode } = useTheme();
@@ -55,39 +55,79 @@ export default function DashboardScreen({ navigation }: any) {
     const fetchDashboardGas = async () => {
         try {
             let targetDate = new Date().toISOString().substring(0, 10);
-            let response = await axios.get(`https://giaxanghomnay.com/api/pvdate/${targetDate}`);
 
-            if (!Array.isArray(response.data) || response.data.length < 2) {
+            let oldResponse = await axios.get(`https://giaxanghomnay.com/api/pvdate/${targetDate}`);
+            if (!Array.isArray(oldResponse.data) || oldResponse.data.length < 2) {
                 targetDate = getPreviousDay(targetDate);
-                response = await axios.get(`https://giaxanghomnay.com/api/pvdate/${targetDate}`);
+                oldResponse = await axios.get(`https://giaxanghomnay.com/api/pvdate/${targetDate}`);
             }
 
-            const todayData = response.data[0] || [];
-            const yesterdayData = response.data[2] || [];
-            const targetKeywords = ['RON 95-V', 'RON 95-III', 'E5 RON 92-II', 'E10 RON 95-III'];
-            const widgetColors = ['#e74c3c', '#e67e22', '#27AE60', '#f39c12'];
+            const plxReqFuel = "eyJGaWx0ZXJCeSI6eyJBbmQiOlt7IlN5c3RlbUlEIjp7IkVxdWFscyI6IjY3ODNkYzEyNzFmZjQ0OWU5NWI3NGE5NTIwOTY0MTY5In19LHsiUmVwb3NpdG9yeUlEIjp7IkVxdWFscyI6ImE5NTQ1MWUyM2I0NzRmZTU4ODZiZmI3Y2Y4NDNmNTNjIn19LHsiUmVwb3NpdG9yeUVudGl0eUlEIjp7IkVxdWFscyI6IjM4MDEzNzhmZTFlMDQ1YjFhZmExMGRlN2M1Nzc2MTI0In19XX19";
+            const plxReqGas = "eyJGaWx0ZXJCeSI6eyJBbmQiOlt7IlN5c3RlbUlEIjp7IkVxdWFscyI6IjcwOTAyNGYzN2UyZTRhZTg5MzgyMWQwNTY0ZjJmYjNlIn19LHsiUmVwb3NpdG9yeUlEIjp7IkVxdWFscyI6ImU4ZjcxMDJjNTY4MzQ3YzJiNWQyZjhjMGY4ZGFiMzhjIn19LHsiUmVwb3NpdG9yeUVudGl0eUlEIjp7IkVxdWFscyI6IjJjYTdmNGI1YzU0MTRlZTlhMzM4ZDY1NDZkNzYyNDNiIn19LHsiU3RhdHVzIjp7IkVxdWFscyI6IlB1Ymxpc2hlZCJ9fV19LCJTb3J0QnkiOnsiTGFzdE1vZGlmaWVkIjoiRGVzY2VuZGluZyJ9LCJQYWdpbmF0aW9uIjp7IlRvdGFsUmVjb3JkcyI6LTEsIlRvdGFsUGFnZXMiOjAsIlBhZ2VTaXplIjowLCJQYWdlTnVtYmVyIjowfX0";
 
-            const processed = targetKeywords.map((keyword, index) => {
-                const todayItem = todayData.find((item: any) => item.title.includes(keyword));
-                if (!todayItem) return null;
+            const [newFuelRes, newGasRes] = await Promise.all([
+                axios.get(`https://portals.petrolimex.com.vn/~apis/portals/cms.item/search?x-request=${plxReqFuel}`),
+                axios.get(`https://portals.petrolimex.com.vn/~apis/portals/cms.item/search?x-request=${plxReqGas}&language=vi-VN`)
+            ]);
 
-                const yesterdayItem = yesterdayData.find((item: any) => item.title === todayItem.title);
-                const change1 = yesterdayItem ? todayItem.zone1_price - yesterdayItem.zone1_price : 0;
-                const change2 = yesterdayItem ? todayItem.zone2_price - yesterdayItem.zone2_price : 0;
+            const newFuelData = newFuelRes.data?.Objects || [];
+            const newGasData = newGasRes.data?.Objects || [];
+            const yesterdayData = oldResponse.data[2] || [];
+
+            const targetKeywords = ['E5 RON 92-II', 'E10 RON 95-III'];
+            const widgetColors = ['#27AE60', '#f39c12'];
+
+            const processedFuel = targetKeywords.map((keyword, index) => {
+                const item = newFuelData.find((i: any) => i.Title.includes(keyword));
+                if (!item) return null;
+                const yItem = yesterdayData.find((y: any) => y.title === item.Title);
+
+                const rawItem = {
+                    title: item.Title,
+                    zone1_price: item.Zone1Price,
+                    zone2_price: item.Zone2Price,
+                    date: item.LastModified || targetDate
+                };
 
                 return {
-                    rawItem: todayItem,
-                    title: todayItem.title.replace(/^Xăng\s+/i, ''),
-                    price1: formatCurrency(todayItem.zone1_price),
-                    price2: formatCurrency(todayItem.zone2_price),
-                    trendValue1: change1,
-                    trendValue2: change2,
+                    rawItem,
+                    title: item.Title.replace(/^Xăng\s+/i, ''),
+                    price1: formatCurrency(item.Zone1Price),
+                    price2: formatCurrency(item.Zone2Price),
+                    trendValue1: yItem ? item.Zone1Price - yItem.zone1_price : 0,
+                    trendValue2: yItem ? item.Zone2Price - (yItem.zone2_price || 0) : 0,
                     color: widgetColors[index],
+                    isGas: false
                 };
             }).filter(Boolean);
 
-            setGasList(processed);
-            await AsyncStorage.setItem('cache_dashboard_gas', JSON.stringify(processed));
+            const targetGasRegions = ['Hà Nội', 'Hải Phòng', 'Đà Nẵng', 'Hồ Chí Minh', 'Cần Thơ'];
+            const processedGas = targetGasRegions.map((region) => {
+                const item = newGasData.find((i: any) => i.Title.includes(region));
+                if (!item) return null;
+
+                const rawItem = {
+                    title: `Gas Petrolimex - ${item.Title}`,
+                    zone1_price: item.TwelvePrice,
+                    zone2_price: item.FortyeightPrice,
+                    date: item.LastModified || targetDate,
+                    isGas: true
+                };
+                return {
+                    rawItem,
+                    title: `Gas - ${item.Title}`,
+                    price1: formatCurrency(item.TwelvePrice),
+                    price2: formatCurrency(item.FortyeightPrice),
+                    trendValue1: 0,
+                    trendValue2: 0,
+                    color: getFuelColor('Gas', colors.primary),
+                    isGas: true
+                };
+            }).filter(Boolean);
+
+            const finalProcessed = [...processedFuel, ...processedGas];
+            setGasList(finalProcessed);
+            await AsyncStorage.setItem('cache_dashboard_gas', JSON.stringify(finalProcessed));
         } catch (error) {
             console.log("Lỗi fetch xăng Dashboard:", error);
         } finally {
@@ -287,12 +327,15 @@ export default function DashboardScreen({ navigation }: any) {
     };
 
     const GasWidget = ({ data }: any) => {
-        const { title, price1, price2, trendValue1, trendValue2, color, rawItem } = data;
+        const { title, price1, price2, trendValue1, trendValue2, color, rawItem, isGas } = data;
 
         const trendValue = isZone1 ? trendValue1 : trendValue2;
         const trendStr = trendValue > 0 ? `+${trendValue}` : trendValue < 0 ? `${trendValue}` : '0';
         const isUp = trendValue > 0;
         const isDown = trendValue < 0;
+
+        const label1 = isGas ? '12 KG' : 'VÙNG 1';
+        const label2 = isGas ? '48 KG' : 'VÙNG 2';
 
         return (
             <TouchableOpacity
@@ -318,7 +361,7 @@ export default function DashboardScreen({ navigation }: any) {
                                 {isZone1 ? price1 : price2} <Text style={styles.unit}>đ</Text>
                             </Text>
 
-                            {!isZone1 && (
+                            {!isZone1 && !isGas && (
                                 <View style={[styles.zoneBadge, { backgroundColor: '#e74c3c20', marginLeft: 6 }]}>
                                     <Text style={[styles.zoneText, { color: colors.upColor }]}>+2%</Text>
                                 </View>
@@ -328,7 +371,7 @@ export default function DashboardScreen({ navigation }: any) {
                         <View style={styles.trendRow}>
                             <View style={[styles.zoneBadge, { backgroundColor: colors.border }]}>
                                 <Text style={[styles.zoneText, { color: colors.textSecondary }]}>
-                                    {isZone1 ? 'VÙNG 1' : 'VÙNG 2'}
+                                    {isZone1 ? label1 : label2}
                                 </Text>
                             </View>
 
@@ -348,8 +391,6 @@ export default function DashboardScreen({ navigation }: any) {
         ? (dashboardGold[metalIndex] || dashboardGold[0])
         : (dashboardSilver[metalIndex] || dashboardSilver[0]);
 
-    const metalLogoUrl = getLogo(currentMetalData.brand) || (currentMetalData.brandId === 'bac-phu-quy' ? getLogo('Phú Quý') : null);
-
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
             <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor="transparent" translucent={true} />
@@ -359,7 +400,6 @@ export default function DashboardScreen({ navigation }: any) {
                 showsVerticalScrollIndicator={false}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} progressViewOffset={insets.top + 115} />}
             >
-                {/* HIỂN THỊ CẢNH BÁO MẤT MẠNG */}
                 {isOffline && (
                     <View style={styles.offlineBanner}>
                         <WifiOff size={16} color="#FFF" style={{ marginRight: 6 }} />
@@ -367,7 +407,6 @@ export default function DashboardScreen({ navigation }: any) {
                     </View>
                 )}
 
-                {/* LOADING TỔNG BAO TRÙM TẤT CẢ */}
                 {isInitialLoading ? (
                     <View style={{ marginTop: 120, alignItems: 'center', justifyContent: 'center' }}>
                         <ActivityIndicator size="large" color={colors.primary} />
@@ -378,7 +417,7 @@ export default function DashboardScreen({ navigation }: any) {
                         {/* --- KHỐI XĂNG DẦU --- */}
                         <View style={styles.section}>
                             <View style={styles.sectionHeader}>
-                                <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Xăng dầu (Petrolimex)</Text>
+                                <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Xăng dầu & Gas (Petrolimex)</Text>
                                 <TouchableOpacity onPress={() => navigation.navigate('Gas')} style={styles.seeAllBtn}>
                                     <Text style={[styles.seeAllText, { color: colors.primary }]}>Chi tiết</Text>
                                     <ChevronRight size={16} color={colors.primary} />
@@ -566,7 +605,6 @@ export default function DashboardScreen({ navigation }: any) {
                     </View>
                 </View>
             </BlurView>
-
         </View>
     );
 }

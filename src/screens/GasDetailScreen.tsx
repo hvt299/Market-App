@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, StatusBar, Image, Animated, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, Fuel, CalendarDays, TrendingUp, TrendingDown, Minus, ChevronDown, Droplet } from 'lucide-react-native';
+import { ChevronLeft, CalendarDays, TrendingUp, TrendingDown, Minus, ChevronDown, Droplet } from 'lucide-react-native';
 import axios from 'axios';
 import { BlurView } from 'expo-blur';
-import { getPreviousDay, formatCurrency, getLogo, getFuelColor } from '../utils/helpers';
+import { getPreviousDay, formatCurrency, getLogo, getFuelColor, formatDate } from '../utils/helpers';
 import { useTheme } from '../theme/ThemeContext';
 
 export default function GasDetailScreen({ route, navigation }: any) {
@@ -14,6 +14,7 @@ export default function GasDetailScreen({ route, navigation }: any) {
 
     const logoUrl = getLogo(provider);
     const isPetrolimex = provider === 'Petrolimex';
+    const isGas = !!gasItem.isGas;
 
     const [historyData, setHistoryData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -59,10 +60,22 @@ export default function GasDetailScreen({ route, navigation }: any) {
 
         let currentKnownPrice1 = isPetrolimex ? gasItem.zone1_price : gasItem.price;
         let currentKnownPrice2 = isPetrolimex ? gasItem.zone2_price : 0;
+        let effectiveDate = gasItem.date || new Date().toISOString().substring(0, 10);
 
-        let searchDate = new Date().toISOString().substring(0, 10);
-        let effectiveDate = searchDate;
+        if (isGas) {
+            history.push({
+                date: effectiveDate,
+                zone1_price: currentKnownPrice1,
+                zone2_price: currentKnownPrice2,
+                change1: 0,
+                change2: 0
+            });
+            setHistoryData(history);
+            setLoading(false);
+            return;
+        }
 
+        let searchDate = effectiveDate;
         let attempts = 0;
         const MAX_HISTORY = 15;
         const MAX_ATTEMPTS = 180;
@@ -146,9 +159,9 @@ export default function GasDetailScreen({ route, navigation }: any) {
                     {isPetrolimex && (
                         <View style={styles.chartLegend}>
                             <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
-                            <Text style={[styles.legendText, { color: colors.textSecondary }]}>Vùng 1</Text>
+                            <Text style={[styles.legendText, { color: colors.textSecondary }]}>{isGas ? '12kg' : 'Vùng 1'}</Text>
                             <View style={[styles.legendDot, { backgroundColor: '#e74c3c', marginLeft: 12 }]} />
-                            <Text style={[styles.legendText, { color: colors.textSecondary }]}>Vùng 2</Text>
+                            <Text style={[styles.legendText, { color: colors.textSecondary }]}>{isGas ? '48kg' : 'Vùng 2'}</Text>
                         </View>
                     )}
                 </View>
@@ -216,11 +229,11 @@ export default function GasDetailScreen({ route, navigation }: any) {
                                     {selectedIndex === index && (
                                         <View style={[styles.tooltip, { backgroundColor: isDarkMode ? '#333' : '#FFF', borderColor: colors.border }]}>
                                             <Text style={{ color: colors.textPrimary, fontSize: 11, fontWeight: 'bold' }}>
-                                                V1: {formatCurrency(item.zone1_price)}
+                                                {isGas ? '12kg' : 'V1'}: {formatCurrency(item.zone1_price)}
                                             </Text>
                                             {isPetrolimex && (
                                                 <Text style={{ color: '#e74c3c', fontSize: 10, fontWeight: 'bold', marginTop: 2 }}>
-                                                    V2: {formatCurrency(item.zone2_price)}
+                                                    {isGas ? '48kg' : 'V2'}: {formatCurrency(item.zone2_price)}
                                                 </Text>
                                             )}
                                         </View>
@@ -241,15 +254,13 @@ export default function GasDetailScreen({ route, navigation }: any) {
         <View style={[styles.container, { backgroundColor: colors.background }]}>
             <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
 
-            <ScrollView contentContainerStyle={{ paddingBottom: 60, paddingTop: insets.top + 60 }} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 80, paddingTop: insets.top + 60 }} showsVerticalScrollIndicator={false}>
 
                 <View style={[styles.overviewCard, { backgroundColor: colors.surface, borderColor: colors.border, overflow: 'hidden' }]}>
-                    {/* WATERMARK BACKGROUND */}
                     <View style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center', zIndex: 0 }]}>
                         {logoUrl && <Image source={{ uri: logoUrl }} style={{ width: 160, height: 160, opacity: 0.05 }} resizeMode="contain" blurRadius={1.5} />}
                     </View>
 
-                    {/* SỬA LOGO THÀNH ICON GIỌT NƯỚC MẶC ĐỊNH */}
                     <View style={[styles.iconBox, { backgroundColor: `${fuelColor}15`, zIndex: 1 }]}>
                         <Droplet size={32} color={fuelColor} />
                     </View>
@@ -260,12 +271,12 @@ export default function GasDetailScreen({ route, navigation }: any) {
 
                     <View style={[styles.priceOverviewRow, { zIndex: 1 }]}>
                         <View style={styles.priceBlock}>
-                            <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>VÙNG 1</Text>
+                            <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>{isGas ? '12 KG' : 'VÙNG 1'}</Text>
                             <Text style={[styles.bigPrice, { color: colors.textPrimary }]}>{formatCurrency(isPetrolimex ? gasItem.zone1_price : gasItem.price)} đ</Text>
                         </View>
                         {isPetrolimex && (
                             <View style={styles.priceBlock}>
-                                <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>VÙNG 2 (+2%)</Text>
+                                <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>{isGas ? '48 KG' : 'VÙNG 2 (+2%)'}</Text>
                                 <Text style={[styles.bigPrice, { color: colors.textPrimary }]}>{formatCurrency(gasItem.zone2_price)} đ</Text>
                             </View>
                         )}
@@ -283,7 +294,7 @@ export default function GasDetailScreen({ route, navigation }: any) {
                             {visibleHistory.map((item, index) => {
                                 const isFirst = index === 0;
                                 const isLast = index === visibleHistory.length - 1 && historyData.length === visibleHistory.length;
-                                const dateStr = item.date.split('-').reverse().join('/');
+                                const dateStr = formatDate(item.date);
 
                                 return (
                                     <View key={index} style={styles.timelineRow}>
@@ -319,7 +330,7 @@ export default function GasDetailScreen({ route, navigation }: any) {
                                                 {isPetrolimex && (
                                                     <View style={[styles.priceChangeRow, { marginTop: 4 }]}>
                                                         <Text style={[styles.hPriceSub, { color: colors.textSecondary }]}>
-                                                            V2: {formatCurrency(item.zone2_price)} đ
+                                                            {isGas ? '48kg' : 'V2'}: {formatCurrency(item.zone2_price)} đ
                                                         </Text>
                                                         {item.change2 !== 0 && (
                                                             <View style={[styles.changeBadge, { paddingVertical: 2, paddingHorizontal: 6, backgroundColor: item.change2 > 0 ? `${colors.upColor}15` : `${colors.downColor}15` }]}>
@@ -365,6 +376,8 @@ export default function GasDetailScreen({ route, navigation }: any) {
                     <View style={{ width: 40 }} />
                 </View>
             </BlurView>
+
+            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.max(insets.bottom, 20), backgroundColor: colors.background, zIndex: 10 }} />
         </View>
     );
 }
