@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, Text, View, FlatList, ActivityIndicator, StatusBar, RefreshControl, Alert, TouchableOpacity, TextInput, Modal } from 'react-native';
+import { StyleSheet, Text, View, FlatList, ActivityIndicator, StatusBar, RefreshControl, TouchableOpacity, TextInput, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import NetInfo from '@react-native-community/netinfo';
@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Search, SlidersHorizontal, Info, CircleHelp, X, WifiOff } from 'lucide-react-native';
 
 import { GasItemCard } from '../components/GasItemCard';
-import { ZoneModal } from '../components/ZoneModal';
+import { ReferenceModal } from '../components/ReferenceModal';
 import { getPreviousDay, formatDate } from '../utils/helpers';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -16,13 +16,14 @@ const PROVIDERS = [
     { id: 'Pvoil', name: 'PVOIL' },
 ];
 
-const FILTERS = ['Tất cả', 'Xăng', 'Dầu'];
+const FILTERS = ['Tất cả', 'Xăng', 'Dầu', 'Gas'];
 
 export default function GasPriceScreen({ navigation }: any) {
     const { colors, isDarkMode } = useTheme();
 
     const [gasData, setGasData] = useState<any[]>([]);
-    const [lastUpdated, setLastUpdated] = useState<string>('');
+    const [lastUpdatedFuel, setLastUpdatedFuel] = useState<string>('');
+    const [lastUpdatedGas, setLastUpdatedGas] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [isOffline, setIsOffline] = useState(false);
@@ -60,20 +61,34 @@ export default function GasPriceScreen({ navigation }: any) {
         setIsOffline(false);
         try {
             let targetDate = dateStr || new Date().toISOString().substring(0, 10);
-            const apiUrl = `https://giaxanghomnay.com/api/pvdate/${targetDate}`;
-            const response = await axios.get(apiUrl);
 
-            if (Array.isArray(response.data) && response.data.length >= 2) {
-                setRawData(response.data);
-                processDataForProvider(response.data, selectedProvider.id);
-                await AsyncStorage.setItem('cache_gas_latest', JSON.stringify(response.data));
-            } else {
-                const yesterday = getPreviousDay(targetDate);
-                if (dateStr !== yesterday) {
-                    await fetchGasPrices(yesterday);
-                    return;
-                }
+            const oldApiUrl = `https://giaxanghomnay.com/api/pvdate/${targetDate}`;
+            let oldResponse = await axios.get(oldApiUrl);
+
+            if (!Array.isArray(oldResponse.data) || oldResponse.data.length < 2) {
+                targetDate = getPreviousDay(targetDate);
+                oldResponse = await axios.get(`https://giaxanghomnay.com/api/pvdate/${targetDate}`);
             }
+
+            const plxReqFuel = "eyJGaWx0ZXJCeSI6eyJBbmQiOlt7IlN5c3RlbUlEIjp7IkVxdWFscyI6IjY3ODNkYzEyNzFmZjQ0OWU5NWI3NGE5NTIwOTY0MTY5In19LHsiUmVwb3NpdG9yeUlEIjp7IkVxdWFscyI6ImE5NTQ1MWUyM2I0NzRmZTU4ODZiZmI3Y2Y4NDNmNTNjIn19LHsiUmVwb3NpdG9yeUVudGl0eUlEIjp7IkVxdWFscyI6IjM4MDEzNzhmZTFlMDQ1YjFhZmExMGRlN2M1Nzc2MTI0In19XX19";
+            const plxReqGas = "eyJGaWx0ZXJCeSI6eyJBbmQiOlt7IlN5c3RlbUlEIjp7IkVxdWFscyI6IjcwOTAyNGYzN2UyZTRhZTg5MzgyMWQwNTY0ZjJmYjNlIn19LHsiUmVwb3NpdG9yeUlEIjp7IkVxdWFscyI6ImU4ZjcxMDJjNTY4MzQ3YzJiNWQyZjhjMGY4ZGFiMzhjIn19LHsiUmVwb3NpdG9yeUVudGl0eUlEIjp7IkVxdWFscyI6IjJjYTdmNGI1YzU0MTRlZTlhMzM4ZDY1NDZkNzYyNDNiIn19LHsiU3RhdHVzIjp7IkVxdWFscyI6IlB1Ymxpc2hlZCJ9fV19LCJTb3J0QnkiOnsiTGFzdE1vZGlmaWVkIjoiRGVzY2VuZGluZyJ9LCJQYWdpbmF0aW9uIjp7IlRvdGFsUmVjb3JkcyI6LTEsIlRvdGFsUGFnZXMiOjAsIlBhZ2VTaXplIjowLCJQYWdlTnVtYmVyIjowfX0";
+
+            const [newFuelRes, newGasRes] = await Promise.all([
+                axios.get(`https://portals.petrolimex.com.vn/~apis/portals/cms.item/search?x-request=${plxReqFuel}`),
+                axios.get(`https://portals.petrolimex.com.vn/~apis/portals/cms.item/search?x-request=${plxReqGas}&language=vi-VN`)
+            ]);
+
+            const rawDataObj = {
+                oldApi: oldResponse.data,
+                newFuel: newFuelRes.data?.Objects || [],
+                newGas: newGasRes.data?.Objects || [],
+                targetDate
+            };
+
+            setRawData(rawDataObj);
+            processDataForProvider(rawDataObj, selectedProvider.id);
+            await AsyncStorage.setItem('cache_gas_latest', JSON.stringify(rawDataObj));
+
         } catch (error) {
             if (!dateStr) {
                 const yesterdayStr = getPreviousDay(new Date().toISOString().split('T')[0]);
@@ -85,35 +100,94 @@ export default function GasPriceScreen({ navigation }: any) {
         }
     };
 
-    const processDataForProvider = (data: any, providerId: string) => {
-        if (!data) return;
+    const processDataForProvider = (dataObj: any, providerId: string) => {
+        if (!dataObj || !dataObj.oldApi) return;
+        const { oldApi, newFuel, newGas, targetDate } = dataObj;
 
-        const isPetrolimex = providerId === 'Petrolimex';
-        const todayData = isPetrolimex ? (data[0] || []) : (data[1] || []);
-        const yesterdayData = isPetrolimex ? (data[2] || []) : (data[3] || []);
+        if (providerId === 'Petrolimex') {
+            const yesterdayData = oldApi[2] || [];
 
-        const combinedData = todayData.map((todayItem: any) => {
-            const yesterdayItem = yesterdayData.find((y: any) => y.title === todayItem.title);
-            let change1 = 0;
-            let change2 = 0;
+            const fuelItems = newFuel
+                .filter((item: any) => item.Title !== 'Xăng RON 95-V' && item.Title !== 'Xăng RON 95-III' && item.Title !== 'Xăng RON 95')
+                .map((item: any) => {
+                    const yItem = yesterdayData.find((y: any) => y.title === item.Title);
+                    return {
+                        title: item.Title,
+                        zone1_price: item.Zone1Price,
+                        zone2_price: item.Zone2Price,
+                        change1: yItem ? item.Zone1Price - yItem.zone1_price : 0,
+                        change2: yItem ? item.Zone2Price - (yItem.zone2_price || 0) : 0,
+                        isGas: false,
+                        date: item.LastModified || targetDate
+                    };
+                })
+                .sort((a: any, b: any) => {
+                    const order = [
+                        'Xăng E10 RON 95-V',
+                        'Xăng E10 RON 95-III',
+                        'Xăng E5 RON 92-II'
+                    ];
+                    const idxA = order.indexOf(a.title);
+                    const idxB = order.indexOf(b.title);
 
-            if (yesterdayItem) {
-                const tPrice1 = isPetrolimex ? todayItem.zone1_price : todayItem.price;
-                const yPrice1 = isPetrolimex ? yesterdayItem.zone1_price : yesterdayItem.price;
-                change1 = tPrice1 - yPrice1;
+                    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                    if (idxA !== -1) return -1;
+                    if (idxB !== -1) return 1;
+                    return 0;
+                });
 
-                if (isPetrolimex) {
-                    const tPrice2 = todayItem.zone2_price || 0;
-                    const yPrice2 = yesterdayItem.zone2_price || 0;
-                    change2 = tPrice2 - yPrice2;
-                }
+            const gasItems = newGas.map((item: any) => ({
+                title: `Gas Petrolimex - ${item.Title}`,
+                zone1_price: item.TwelvePrice,
+                zone2_price: item.FortyeightPrice,
+                change1: 0,
+                change2: 0,
+                isGas: true,
+                date: item.LastModified || targetDate
+            }))
+                .sort((a: any, b: any) => {
+                    const order = [
+                        'Gas Petrolimex - Hà Nội',
+                        'Gas Petrolimex - Hải Phòng',
+                        'Gas Petrolimex - Đà Nẵng',
+                        'Gas Petrolimex - Hồ Chí Minh',
+                        'Gas Petrolimex - Cần Thơ'
+                    ];
+                    const idxA = order.indexOf(a.title);
+                    const idxB = order.indexOf(b.title);
+
+                    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                    if (idxA !== -1) return -1;
+                    if (idxB !== -1) return 1;
+                    return 0;
+                });
+
+            const combined = [...fuelItems, ...gasItems];
+            setGasData(combined);
+
+            setLastUpdatedFuel(formatDate(targetDate));
+            if (gasItems.length > 0) {
+                setLastUpdatedGas(formatDate(gasItems[0].date));
+            } else {
+                setLastUpdatedGas(formatDate(targetDate));
             }
-            return { ...todayItem, change1, change2 };
-        });
 
-        setGasData(combinedData);
-        if (combinedData.length > 0 && combinedData[0].date) {
-            setLastUpdated(formatDate(combinedData[0].date));
+        } else if (providerId === 'Pvoil') {
+            const todayData = oldApi[1] || [];
+            const yesterdayData = oldApi[3] || [];
+
+            const combined = todayData.map((item: any) => {
+                const yItem = yesterdayData.find((y: any) => y.title === item.title);
+                return {
+                    ...item,
+                    zone1_price: item.price,
+                    change1: yItem ? item.price - yItem.price : 0,
+                    isGas: false,
+                    date: targetDate
+                };
+            });
+            setGasData(combined);
+            setLastUpdatedFuel(formatDate(targetDate));
         }
     };
 
@@ -153,7 +227,8 @@ export default function GasPriceScreen({ navigation }: any) {
         const matchType =
             selectedFilter === 'Tất cả' ? true :
                 selectedFilter === 'Xăng' ? item.title.toLowerCase().includes('xăng') || item.title.toLowerCase().includes('ron') :
-                    item.title.toLowerCase().includes('do') || item.title.toLowerCase().includes('dầu') || item.title.toLowerCase().includes('ko');
+                    selectedFilter === 'Dầu' ? item.title.toLowerCase().includes('do') || item.title.toLowerCase().includes('dầu') || item.title.toLowerCase().includes('ko') || item.title.toLowerCase().includes('mazut') :
+                        selectedFilter === 'Gas' ? !!item.isGas : false;
 
         return matchSearch && matchType;
     });
@@ -165,14 +240,16 @@ export default function GasPriceScreen({ navigation }: any) {
             <SafeAreaView style={styles.headerContainer} edges={['top', 'left', 'right']}>
                 <View style={styles.topBar}>
                     <View>
-                        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Giá xăng dầu</Text>
-                        <Text style={[styles.updateText, { color: colors.textSecondary }]}>Cập nhật: {lastUpdated}</Text>
+                        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Giá xăng dầu & gas</Text>
+                        <Text style={[styles.updateText, { color: colors.textSecondary }]}>
+                            {selectedProvider.id === 'Petrolimex'
+                                ? `Xăng: ${lastUpdatedFuel}  -  Gas: ${lastUpdatedGas}`
+                                : `Cập nhật: ${lastUpdatedFuel}`}
+                        </Text>
                     </View>
-                    {selectedProvider.id === 'Petrolimex' && (
-                        <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.helpBtn}>
-                            <CircleHelp size={24} color={colors.textPrimary} />
-                        </TouchableOpacity>
-                    )}
+                    <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.helpBtn}>
+                        <CircleHelp size={24} color={colors.textPrimary} />
+                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.searchWrapper}>
@@ -205,7 +282,7 @@ export default function GasPriceScreen({ navigation }: any) {
                 <View style={styles.legendRow}>
                     <Info size={14} color={colors.textSecondary} />
                     <Text style={[styles.legendText, { color: colors.textSecondary }]}>
-                        Giá bên phải: <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Vùng 1 (Trên)</Text> - <Text style={{ fontWeight: '700', color: colors.textSecondary }}>Vùng 2 (Dưới)</Text>
+                        Giá bên phải: <Text style={{ fontWeight: '700', color: colors.textPrimary }}>Vùng 1 / 12kg (Trên)</Text> - <Text style={{ fontWeight: '700', color: colors.textSecondary }}>Vùng 2 / 48kg (Dưới)</Text>
                     </Text>
                 </View>
             </View>
@@ -227,7 +304,7 @@ export default function GasPriceScreen({ navigation }: any) {
                 )}
             </View>
 
-            <ZoneModal visible={modalVisible} onClose={() => setModalVisible(false)} />
+            <ReferenceModal visible={modalVisible} onClose={() => setModalVisible(false)} />
 
             <Modal visible={filterModalVisible} transparent animationType="fade" statusBarTranslucent>
                 <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setFilterModalVisible(false)}>

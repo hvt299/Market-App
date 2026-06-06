@@ -16,25 +16,21 @@ export const GasItemCard: React.FC<GasItemCardProps> = ({ item, providerId, onPr
 
     const isPvoil = providerId.toLowerCase() === 'pvoil';
     const displayTitle = item.title.replace(/^Xăng\s+/i, '');
+    const isGas = !!item.isGas;
 
     const fuelColor = getFuelColor(item.title, colors.primary);
 
-    const renderTrendBadge = (change: number, isSmall = false) => {
-        if (change === undefined || change === 0) return null;
+    const renderTrendBadge = (change: number) => {
+        if (!change) return null;
 
         const isUp = change > 0;
         const color = isUp ? colors.upColor : colors.downColor;
         const Icon = isUp ? TrendingUp : TrendingDown;
 
-        const iconSize = isSmall ? 12 : 14;
-        const fontSize = isSmall ? 11 : 13;
-        const padV = isSmall ? 2 : 4;
-        const padH = isSmall ? 6 : 8;
-
         return (
-            <View style={[styles.trendBadge, { backgroundColor: `${color}15`, paddingVertical: padV, paddingHorizontal: padH }]}>
-                <Icon size={iconSize} color={color} />
-                <Text style={[styles.trendText, { color, fontSize }]}>{Math.abs(change)}</Text>
+            <View style={[styles.trendBadge, { backgroundColor: `${color}15`, paddingVertical: 4, paddingHorizontal: 8 }]}>
+                <Icon size={14} color={color} />
+                <Text style={[styles.trendText, { color, fontSize: 13 }]}>{Math.abs(change)}</Text>
             </View>
         );
     };
@@ -53,12 +49,10 @@ export const GasItemCard: React.FC<GasItemCardProps> = ({ item, providerId, onPr
                 }
             ]}
         >
-            {/* 1. WATERMARK */}
             <View style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center', zIndex: 0 }]}>
                 {logoUrl && <Image source={{ uri: logoUrl }} style={{ width: 120, height: 120, opacity: 0.05 }} resizeMode="contain" blurRadius={1.5} />}
             </View>
 
-            {/* 2. LEFTCONTENT */}
             <View style={[styles.leftContent, { zIndex: 1 }]}>
                 <View style={[styles.iconBox, { backgroundColor: `${fuelColor}15` }]}>
                     <Droplet size={20} color={fuelColor} />
@@ -68,7 +62,6 @@ export const GasItemCard: React.FC<GasItemCardProps> = ({ item, providerId, onPr
                 </Text>
             </View>
 
-            {/* 3. BỔ SUNG zIndex: 1 CHO DIVIDER VÀ RIGHTCONTENT KẺO BỊ MỜ */}
             <View style={[styles.verticalDivider, { backgroundColor: colors.border, zIndex: 1 }]} />
 
             <View style={[styles.rightContent, { zIndex: 1 }]}>
@@ -76,22 +69,22 @@ export const GasItemCard: React.FC<GasItemCardProps> = ({ item, providerId, onPr
                     <View style={styles.priceRow}>
                         {renderTrendBadge(item.change1)}
                         <Text style={[styles.priceText, { color: colors.textPrimary }]}>
-                            {formatCurrency(item.price)} <Text style={styles.unit}>đ</Text>
+                            {formatCurrency(item.zone1_price)} <Text style={styles.unit}>đ</Text>
                         </Text>
                     </View>
                 ) : (
                     <>
-                        {/* Vùng 1 - Size tiêu chuẩn */}
                         <View style={styles.priceRow}>
                             {renderTrendBadge(item.change1)}
+                            {isGas && <Text style={[styles.unit, { color: colors.textSecondary, marginRight: 2 }]}>12kg:</Text>}
                             <Text style={[styles.priceText, { color: colors.textPrimary }]}>
                                 {formatCurrency(item.zone1_price)} <Text style={styles.unit}>đ</Text>
                             </Text>
                         </View>
-                        {/* Vùng 2 - Size nhỏ (isSmall = true) */}
                         <View style={[styles.priceRow, { marginTop: 6 }]}>
-                            {renderTrendBadge(item.change2, true)}
-                            <Text style={[styles.priceTextSub, { color: colors.textSecondary }]}>
+                            {renderTrendBadge(item.change2)}
+                            {isGas && <Text style={[styles.unit, { color: colors.textSecondary, marginRight: 2 }]}>48kg:</Text>}
+                            <Text style={[styles.priceText, { color: colors.textSecondary }]}>
                                 {formatCurrency(item.zone2_price)} <Text style={styles.unit}>đ</Text>
                             </Text>
                         </View>
@@ -110,8 +103,7 @@ const styles = StyleSheet.create({
     verticalDivider: { width: 1, height: '80%', marginHorizontal: 16 },
     rightContent: { alignItems: 'flex-end', justifyContent: 'center', minWidth: 85 },
     priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
-    priceText: { fontSize: 17, fontWeight: '800', letterSpacing: -0.5 },
-    priceTextSub: { fontSize: 15, fontWeight: '600', letterSpacing: -0.5 },
+    priceText: { fontSize: 16, fontWeight: '800', letterSpacing: -0.5 },
     unit: { fontSize: 12, fontWeight: '600' },
     trendBadge: { flexDirection: 'row', alignItems: 'center', borderRadius: 6 },
     trendText: { fontWeight: '700', marginLeft: 2 }
