@@ -3,7 +3,8 @@ import { View, Text, Modal, TouchableOpacity, StyleSheet, ScrollView } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ZONE_2_DATA } from '../constants/zoneData';
 import { useTheme } from '../theme/ThemeContext';
-import { X, Map, Fuel, Flame } from 'lucide-react-native';
+import { FONTS } from '../theme/typography';
+import { X } from 'lucide-react-native';
 
 interface ReferenceModalProps {
     visible: boolean;
@@ -25,21 +26,21 @@ export const ReferenceModal: React.FC<ReferenceModalProps> = ({ visible, onClose
     const renderTabContent = () => {
         if (activeTab === 0) {
             return (
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-                    <Text style={[styles.modalNote, { color: colors.textSecondary, backgroundColor: isDarkMode ? '#2c2c2e' : '#f9f9f9', borderLeftColor: colors.primary }]}>
-                        (*) Giá bán Vùng 2 (Petrolimex) cao hơn tối đa 2% so với giá điều hành. Riêng mặt hàng Madút tại <Text style={{ fontWeight: '700', color: colors.primary }}>Bà Rịa - Vũng Tàu</Text> áp dụng giá Vùng 1.
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+                    <Text style={[styles.modalNote, { color: colors.textSecondary, backgroundColor: colors.surfaceSubtle, borderLeftColor: colors.primary }]}>
+                        (*) Giá bán Vùng 2 (Petrolimex) cao hơn tối đa 2% so với giá điều hành. Riêng mặt hàng Madút tại <Text style={{ fontFamily: FONTS.bold, color: colors.primary }}>Bà Rịa - Vũng Tàu</Text> áp dụng giá Vùng 1.
                     </Text>
                     {ZONE_2_DATA.map((section, index) => {
                         const isLong = index === 1;
                         return (
                             <View key={index} style={styles.sectionContainer}>
-                                <View style={[styles.sectionHeader, { backgroundColor: isDarkMode ? colors.border : '#dfe4ea' }]}>
+                                <View style={[styles.sectionHeader, { backgroundColor: colors.surfaceSubtle }]}>
                                     <Text style={[styles.sectionHeaderText, { color: colors.textPrimary }]}>{section.title}</Text>
                                 </View>
                                 <View style={styles.gridContainer}>
                                     {section.data.map((item, idx) => (
                                         <View key={idx} style={[isLong ? styles.fullItem : styles.gridItem, { borderColor: colors.border }]}>
-                                            <Text style={[styles.provinceText, isLong && { textAlign: 'left', paddingLeft: 8 }, item.includes('*') ? { color: colors.primary, fontWeight: '700' } : { color: colors.textSecondary }]}>{item}</Text>
+                                            <Text style={[styles.provinceText, isLong && { textAlign: 'left', paddingLeft: 8 }, item.includes('*') ? { color: colors.primary, fontFamily: FONTS.bold } : { color: colors.textSecondary }]}>{item}</Text>
                                         </View>
                                     ))}
                                 </View>
@@ -52,26 +53,25 @@ export const ReferenceModal: React.FC<ReferenceModalProps> = ({ visible, onClose
 
         if (activeTab === 1) {
             return (
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-                    <DefinitionItem title="Xăng E5 RON 92" desc="Là hỗn hợp gồm 95% xăng khoáng truyền thống và 5% cồn sinh học Ethanol. Xăng có màu xanh, phù hợp với hầu hết các loại xe máy phổ thông và ô tô đời cũ." />
-                    <DefinitionItem title="Xăng E10" desc="Theo lộ trình chuyển đổi, xăng sinh học E10 (pha 10% ethanol) đang dần thay thế xăng khoáng. Loại xăng này có khả năng đốt cháy sạch, bảo vệ môi trường và tối ưu cho các dòng xe đời mới." />
-                    <DefinitionItem title="Xăng RON 95-III (A95)" desc="Xăng không chì cao cấp có chỉ số octan 95 đạt tiêu chuẩn khí thải Euro 3. Có màu vàng nhạt, khả năng chống kích nổ tốt, giúp động cơ vận hành êm ái và bền bỉ." />
-                    <DefinitionItem title="Xăng RON 95-IV" desc="Là phiên bản cao cấp hơn của A95, đạt tiêu chuẩn khí thải Euro 4 hoặc Euro 5. Loại này có hàm lượng lưu huỳnh cực thấp, thân thiện với môi trường và phù hợp cho các dòng xe hơi hạng sang." />
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+                    <DefinitionItem title="Xăng E10 RON 95 Mức 5 (cũ: RON 95-V)" desc="Xăng sinh học cao cấp pha 10% ethanol đạt tiêu chuẩn khí thải Mức 5 (tương đương Euro 5). Hàm lượng lưu huỳnh cực thấp, bảo vệ môi trường và tối ưu cho các dòng xe đời mới, xe hạng sang." />
+                    <DefinitionItem title="Xăng E10 RON 95 Mức 3 (cũ: RON 95-III / A95)" desc="Xăng sinh học pha 10% ethanol đạt tiêu chuẩn khí thải Mức 3 (tương đương Euro 3). Khả năng chống kích nổ tốt, giúp động cơ vận hành êm ái, bền bỉ và phổ biến nhất trên thị trường." />
+                    <DefinitionItem title="Xăng E5 RON 92 Mức 2 (cũ: E5 RON 92-II)" desc="Là hỗn hợp gồm xăng khoáng và 5% cồn sinh học Ethanol đạt tiêu chuẩn Mức 2 (Euro 2), phù hợp với hầu hết các dòng xe máy phổ thông và ô tô đời cũ." />
                 </ScrollView>
             );
         }
 
         return (
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 8, marginTop: 10 }}>Dầu Diesel (DO)</Text>
-                <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 12 }}>Là nhiên liệu chủ lực cho các dòng xe tải, xe bán tải, tàu thuyền, máy móc nông nghiệp và máy phát điện. Tại Việt Nam, dầu Diesel được chia theo hàm lượng lưu huỳnh:</Text>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+                <Text style={{ fontFamily: FONTS.bold, fontSize: 16, color: colors.textPrimary, marginBottom: 8, marginTop: 10 }}>Dầu Diesel (DO)</Text>
+                <Text style={{ fontFamily: FONTS.regular, fontSize: 13, color: colors.textSecondary, marginBottom: 12 }}>Là nhiên liệu chủ lực cho các dòng xe tải, xe bán tải, tàu thuyền, máy móc nông nghiệp và máy phát điện. Tại Việt Nam, dầu Diesel được chia theo hàm lượng lưu huỳnh và mức tiêu chuẩn khí thải:</Text>
 
-                <DefinitionItem title="DO 0.001S (Euro 5)" desc="Loại dầu cao cấp nhất hiện nay, cực ít lưu huỳnh, ít khói, giúp kéo dài tuổi thọ động cơ và giảm thiểu ô nhiễm." />
-                <DefinitionItem title="DO 0.05S" desc="Loại dầu phổ biến trên thị trường, đáp ứng các tiêu chuẩn khí thải mức thấp hơn." />
+                <DefinitionItem title="DO 0,001S Mức 5 (cũ: DO 0.001S-V / Euro 5)" desc="Loại dầu cao cấp nhất hiện nay, cực ít lưu huỳnh (tối đa 10 mg/kg), ít khói, giúp kéo dài tuổi thọ động cơ và giảm thiểu tối đa ô nhiễm môi trường." />
+                <DefinitionItem title="DO 0,05S Mức 2 (cũ: DO 0.05S-II / Euro 2)" desc="Loại dầu phổ biến nhất trên thị trường hiện nay với hàm lượng lưu huỳnh tối đa 500 mg/kg, đáp ứng tiêu chuẩn vận hành xe thông dụng." />
 
-                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 8, marginTop: 16 }}>Khác</Text>
-                <DefinitionItem title="Dầu hỏa 2-K" desc="Nhiên liệu sử dụng cho thắp sáng, đun nấu hoặc các mục đích công nghiệp đặc thù." />
-                <DefinitionItem title="Gas (LPG)" desc="Khí đốt hóa lỏng chuyên dụng. Bình 12kg chủ yếu dùng cho hộ gia đình, bình 48kg dùng cho nhà hàng và công nghiệp." />
+                <Text style={{ fontFamily: FONTS.bold, fontSize: 16, color: colors.textPrimary, marginBottom: 8, marginTop: 16 }}>Khác</Text>
+                <DefinitionItem title="Dầu hỏa 2-K (Dầu KO)" desc="Nhiên liệu sử dụng cho thắp sáng, đun nấu hoặc các mục đích công nghiệp đặc thù." />
+                <DefinitionItem title="Gas Petrolimex (LPG)" desc="Khí đốt hóa lỏng chuyên dụng. Bình 12kg chủ yếu dùng cho hộ gia đình, bình 48kg dùng cho nhà hàng và công nghiệp." />
             </ScrollView>
         );
     };
@@ -84,12 +84,12 @@ export const ReferenceModal: React.FC<ReferenceModalProps> = ({ visible, onClose
                 <View style={[styles.modalContent, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 10 }]}>
                     <View style={styles.modalHeader}>
                         <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Tra cứu thông tin</Text>
-                        <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: colors.border }]}>
+                        <TouchableOpacity onPress={onClose} style={[styles.closeBtn, { backgroundColor: colors.surfaceSubtle }]}>
                             <X size={20} color={colors.textPrimary} />
                         </TouchableOpacity>
                     </View>
 
-                    <View style={[styles.tabsWrapper, { backgroundColor: isDarkMode ? '#2c2c2e' : '#f0f2f5' }]}>
+                    <View style={[styles.tabsWrapper, { backgroundColor: colors.surfaceSubtle }]}>
                         <TouchableOpacity onPress={() => setActiveTab(0)} style={[styles.tabBtn, activeTab === 0 && { backgroundColor: colors.surface }]}>
                             <Text style={[styles.tabText, { color: activeTab === 0 ? colors.primary : colors.textSecondary }]}>Vùng 2</Text>
                         </TouchableOpacity>
@@ -112,25 +112,25 @@ export const ReferenceModal: React.FC<ReferenceModalProps> = ({ visible, onClose
 
 const styles = StyleSheet.create({
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-    modalContent: { height: '85%', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 0 },
+    modalContent: { height: '85%', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, paddingBottom: 0 },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-    modalTitle: { fontSize: 20, fontWeight: 'bold' },
+    modalTitle: { fontFamily: FONTS.bold, fontSize: 20 },
     closeBtn: { padding: 6, borderRadius: 20 },
 
-    tabsWrapper: { flexDirection: 'row', padding: 4, borderRadius: 12, marginBottom: 16 },
-    tabBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
-    tabText: { fontSize: 13, fontWeight: '700' },
+    tabsWrapper: { flexDirection: 'row', padding: 4, borderRadius: 14, marginBottom: 16 },
+    tabBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 10 },
+    tabText: { fontFamily: FONTS.bold, fontSize: 13 },
 
-    modalNote: { fontSize: 13, fontStyle: 'italic', marginBottom: 16, lineHeight: 20, padding: 12, borderRadius: 8, borderLeftWidth: 3 },
+    modalNote: { fontFamily: FONTS.regular, fontSize: 13, marginBottom: 16, lineHeight: 20, padding: 12, borderRadius: 10, borderLeftWidth: 3 },
     sectionContainer: { marginBottom: 16 },
-    sectionHeader: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, marginBottom: 8 },
-    sectionHeaderText: { fontSize: 13, fontWeight: 'bold', textTransform: 'uppercase' },
+    sectionHeader: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, marginBottom: 8 },
+    sectionHeaderText: { fontFamily: FONTS.bold, fontSize: 12, textTransform: 'uppercase' },
     gridContainer: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4 },
     gridItem: { width: '33.33%', paddingHorizontal: 4, paddingVertical: 6, justifyContent: 'center' },
     fullItem: { width: '100%', paddingHorizontal: 4, paddingVertical: 6, justifyContent: 'center' },
-    provinceText: { fontSize: 13, textAlign: 'center', fontWeight: '500' },
+    provinceText: { fontFamily: FONTS.medium, fontSize: 13, textAlign: 'center' },
 
     defItem: { paddingVertical: 12, borderBottomWidth: 1 },
-    defTitle: { fontSize: 15, fontWeight: 'bold', marginBottom: 4 },
-    defDesc: { fontSize: 13, lineHeight: 20 }
+    defTitle: { fontFamily: FONTS.bold, fontSize: 15, marginBottom: 4 },
+    defDesc: { fontFamily: FONTS.regular, fontSize: 13, lineHeight: 20 }
 });

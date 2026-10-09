@@ -5,6 +5,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { Droplet, Coins, Banknote, LayoutDashboard, Settings } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeContext';
+import { FONTS } from '../theme/typography';
 
 import DashboardScreen from '../screens/DashboardScreen';
 import GasPriceScreen from '../screens/GasPriceScreen';
@@ -18,7 +19,7 @@ const Stack = createNativeStackNavigator();
 
 function MainTabs() {
     const insets = useSafeAreaInsets();
-    const paddingBottom = insets.bottom > 0 ? insets.bottom : 15;
+    const paddingBottom = insets.bottom > 0 ? insets.bottom : 12;
     const { colors, isDarkMode } = useTheme();
 
     return (
@@ -33,19 +34,73 @@ function MainTabs() {
                     backgroundColor: colors.tabBar,
                     borderTopWidth: 1,
                     borderTopColor: colors.border,
-                    height: 65 + paddingBottom,
+                    height: 60 + paddingBottom,
                     paddingBottom: paddingBottom,
                     paddingTop: 8,
-                    elevation: isDarkMode ? 0 : 20,
+                    elevation: 8,
+                    zIndex: 100,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: -2 },
+                    shadowOpacity: isDarkMode ? 0 : 0.04,
+                    shadowRadius: 6,
                 },
-                tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginBottom: 4 }
+                tabBarLabelStyle: {
+                    fontFamily: FONTS.semiBold,
+                    fontSize: 11,
+                    marginBottom: 4,
+                },
             }}
         >
-            <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: 'Tổng quan', tabBarIcon: ({ color, size }) => <LayoutDashboard size={size} color={color} strokeWidth={2} /> }} />
-            <Tab.Screen name="Gas" component={GasPriceScreen} options={{ tabBarLabel: 'Xăng dầu', tabBarIcon: ({ color, size }) => <Droplet size={size} color={color} strokeWidth={2.5} /> }} />
-            <Tab.Screen name="Gold" component={GoldPriceScreen} options={{ tabBarLabel: 'Vàng bạc', tabBarIcon: ({ color, size }) => <Coins size={size} color={color} strokeWidth={2} /> }} />
-            <Tab.Screen name="Exchange" component={ExchangeRateScreen} options={{ tabBarLabel: 'Tỷ giá', tabBarIcon: ({ color, size }) => <Banknote size={size} color={color} strokeWidth={2} /> }} />
-            <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Cài đặt', tabBarIcon: ({ color, size }) => <Settings size={size} color={color} strokeWidth={2} /> }} />
+            <Tab.Screen
+                name="Dashboard"
+                component={DashboardScreen}
+                options={{
+                    tabBarLabel: 'Tổng quan',
+                    tabBarIcon: ({ color, size }) => (
+                        <LayoutDashboard size={size - 2} color={color} strokeWidth={2.2} />
+                    ),
+                }}
+            />
+            <Tab.Screen
+                name="Gas"
+                component={GasPriceScreen}
+                options={{
+                    tabBarLabel: 'Xăng dầu',
+                    tabBarIcon: ({ color, size }) => (
+                        <Droplet size={size - 2} color={color} strokeWidth={2.5} />
+                    ),
+                }}
+            />
+            <Tab.Screen
+                name="Gold"
+                component={GoldPriceScreen}
+                options={{
+                    tabBarLabel: 'Vàng bạc',
+                    tabBarIcon: ({ color, size }) => (
+                        <Coins size={size - 2} color={color} strokeWidth={2.2} />
+                    ),
+                }}
+            />
+            <Tab.Screen
+                name="Exchange"
+                component={ExchangeRateScreen}
+                options={{
+                    tabBarLabel: 'Tỷ giá',
+                    tabBarIcon: ({ color, size }) => (
+                        <Banknote size={size - 2} color={color} strokeWidth={2.2} />
+                    ),
+                }}
+            />
+            <Tab.Screen
+                name="Settings"
+                component={SettingsScreen}
+                options={{
+                    tabBarLabel: 'Cài đặt',
+                    tabBarIcon: ({ color, size }) => (
+                        <Settings size={size - 2} color={color} strokeWidth={2.2} />
+                    ),
+                }}
+            />
         </Tab.Navigator>
     );
 }

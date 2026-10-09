@@ -1,14 +1,17 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, ActivityIndicator, RefreshControl, Image, StatusBar } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { View, StyleSheet, ScrollView, Animated, ActivityIndicator, RefreshControl, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
-import axios from 'axios';
-import { parse } from 'node-html-parser';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../theme/ThemeContext';
-import { Droplet, Coins, ChevronRight, TrendingUp, TrendingDown, Minus, WifiOff } from 'lucide-react-native';
-import { getPreviousDay, formatCurrency, getLogo, getFuelColor } from '../utils/helpers';
+import { MarketHeader } from '../components/dashboard/MarketHeader';
+import { MarketMarquee, MarqueeItem } from '../components/dashboard/MarketMarquee';
+import { GasWidgetSection } from '../components/dashboard/GasWidgetSection';
+import { MetalsCardSection } from '../components/dashboard/MetalsCardSection';
+import { ExchangeCardSection } from '../components/dashboard/ExchangeCardSection';
+import { fetchFullGasData, extractDashboardFuels, DashboardFuelItem } from '../services/gasService';
+import { fetchDashboardMetalsData, MetalDashboardGroup } from '../services/metalService';
+import { fetchDashboardExchangeData, DashboardExchangeRate, formatVNRate } from '../services/exchangeService';
 
 export default function DashboardScreen({ navigation }: any) {
     const { colors, isDarkMode } = useTheme();
@@ -18,306 +21,107 @@ export default function DashboardScreen({ navigation }: any) {
         day: '2-digit', month: '2-digit', year: 'numeric'
     });
 
-    const [isZone1, setIsZone1] = useState(true);
+    // Cross-fade animation for auto-rotating tabs/zones
     const fadeAnim = useRef(new Animated.Value(1)).current;
 
-    const [gasList, setGasList] = useState<any[]>([]);
-    const [loadingGas, setLoadingGas] = useState(true);
+    // Data States
+    const [gasList, setGasList] = useState<DashboardFuelItem[]>([]);
+    const [isZone1, setIsZone1] = useState(true);
 
     const [activeMetal, setActiveMetal] = useState<'gold' | 'silver'>('gold');
     const [metalIndex, setMetalIndex] = useState(0);
-    const [loadingMetal, setLoadingMetal] = useState(true);
+    const [dashboardGold, setDashboardGold] = useState<MetalDashboardGroup[]>([]);
+    const [dashboardSilver, setDashboardSilver] = useState<MetalDashboardGroup[]>([]);
 
-    const [dashboardGold, setDashboardGold] = useState<any[]>([
-        { brandId: 'sjc', brand: 'SJC', region: 'TP. Hồ Chí Minh', item1: { buy: '...', sell: '...' }, item2: { buy: '...', sell: '...' } },
-    ]);
-    const [dashboardSilver, setDashboardSilver] = useState<any[]>([
-        { brandId: 'bac-phu-quy', brand: 'Bạc Phú Quý', region: 'Đang tải...', item1: { title: 'Bạc miếng 1 Lượng', buy: '...', sell: '...', unit: 'đ/lượng' }, item2: { title: 'Bạc thỏi 10 Lượng', buy: '...', sell: '...', unit: 'đ/lượng' } }
-    ]);
-
-    const [exchangeRates, setExchangeRates] = useState<any[]>([]);
-    const [loadingExchange, setLoadingExchange] = useState(true);
+    const [exchangeRates, setExchangeRates] = useState<DashboardExchangeRate[]>([]);
     const [exchangeStateIndex, setExchangeStateIndex] = useState(0);
 
     const [refreshing, setRefreshing] = useState(false);
     const [isOffline, setIsOffline] = useState(false);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
 
-    const formatVNRate = (value: string) => {
-        if (!value || value === '-' || value === '0' || value === '') return '-';
-        let valStr = value.toString().replace(/,/g, '');
-        let parts = valStr.split('.');
-        let intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-        let decPart = parts.length > 1 ? parts[1] : '';
-        return decPart ? `${intPart},${decPart}` : intPart;
-    };
-
-    const fetchDashboardGas = async () => {
-        try {
-            let targetDate = new Date().toISOString().substring(0, 10);
-
-            let oldResponse = await axios.get(`https://giaxanghomnay.com/api/pvdate/${targetDate}`);
-            if (!Array.isArray(oldResponse.data) || oldResponse.data.length < 2) {
-                targetDate = getPreviousDay(targetDate);
-                oldResponse = await axios.get(`https://giaxanghomnay.com/api/pvdate/${targetDate}`);
-            }
-
-            const plxReqFuel = "eyJGaWx0ZXJCeSI6eyJBbmQiOlt7IlN5c3RlbUlEIjp7IkVxdWFscyI6IjY3ODNkYzEyNzFmZjQ0OWU5NWI3NGE5NTIwOTY0MTY5In19LHsiUmVwb3NpdG9yeUlEIjp7IkVxdWFscyI6ImE5NTQ1MWUyM2I0NzRmZTU4ODZiZmI3Y2Y4NDNmNTNjIn19LHsiUmVwb3NpdG9yeUVudGl0eUlEIjp7IkVxdWFscyI6IjM4MDEzNzhmZTFlMDQ1YjFhZmExMGRlN2M1Nzc2MTI0In19XX19";
-            const plxReqGas = "eyJGaWx0ZXJCeSI6eyJBbmQiOlt7IlN5c3RlbUlEIjp7IkVxdWFscyI6IjcwOTAyNGYzN2UyZTRhZTg5MzgyMWQwNTY0ZjJmYjNlIn19LHsiUmVwb3NpdG9yeUlEIjp7IkVxdWFscyI6ImU4ZjcxMDJjNTY4MzQ3YzJiNWQyZjhjMGY4ZGFiMzhjIn19LHsiUmVwb3NpdG9yeUVudGl0eUlEIjp7IkVxdWFscyI6IjJjYTdmNGI1YzU0MTRlZTlhMzM4ZDY1NDZkNzYyNDNiIn19LHsiU3RhdHVzIjp7IkVxdWFscyI6IlB1Ymxpc2hlZCJ9fV19LCJTb3J0QnkiOnsiTGFzdE1vZGlmaWVkIjoiRGVzY2VuZGluZyJ9LCJQYWdpbmF0aW9uIjp7IlRvdGFsUmVjb3JkcyI6LTEsIlRvdGFsUGFnZXMiOjAsIlBhZ2VTaXplIjowLCJQYWdlTnVtYmVyIjowfX0";
-
-            const [newFuelRes, newGasRes] = await Promise.all([
-                axios.get(`https://portals.petrolimex.com.vn/~apis/portals/cms.item/search?x-request=${plxReqFuel}`),
-                axios.get(`https://portals.petrolimex.com.vn/~apis/portals/cms.item/search?x-request=${plxReqGas}&language=vi-VN`)
-            ]);
-
-            const newFuelData = newFuelRes.data?.Objects || [];
-            const newGasData = newGasRes.data?.Objects || [];
-            const yesterdayData = oldResponse.data[2] || [];
-
-            const targetKeywords = ['E10 RON 95-V', 'E10 RON 95-III', 'E5 RON 92-II'];
-            const widgetColors = ['#e74c3c', '#f39c12', '#27AE60'];
-
-            const processedFuel = targetKeywords.map((keyword, index) => {
-                const item = newFuelData.find((i: any) => i.Title.includes(keyword));
-                if (!item) return null;
-                const yItem = yesterdayData.find((y: any) => y.title === item.Title);
-
-                const rawItem = {
-                    title: item.Title,
-                    zone1_price: item.Zone1Price,
-                    zone2_price: item.Zone2Price,
-                    date: item.LastModified || targetDate
-                };
-
-                return {
-                    rawItem,
-                    title: item.Title.replace(/^Xăng\s+/i, ''),
-                    price1: formatCurrency(item.Zone1Price),
-                    price2: formatCurrency(item.Zone2Price),
-                    trendValue1: yItem ? item.Zone1Price - yItem.zone1_price : 0,
-                    trendValue2: yItem ? item.Zone2Price - (yItem.zone2_price || 0) : 0,
-                    color: widgetColors[index],
-                    isGas: false
-                };
-            }).filter(Boolean);
-
-            const targetGasRegions = ['Hà Nội', 'Hải Phòng', 'Đà Nẵng', 'Hồ Chí Minh', 'Cần Thơ'];
-            const processedGas = targetGasRegions.map((region) => {
-                const item = newGasData.find((i: any) => i.Title.includes(region));
-                if (!item) return null;
-
-                const rawItem = {
-                    title: `Gas Petrolimex - ${item.Title}`,
-                    zone1_price: item.TwelvePrice,
-                    zone2_price: item.FortyeightPrice,
-                    date: item.LastModified || targetDate,
-                    isGas: true
-                };
-                return {
-                    rawItem,
-                    title: `Gas - ${item.Title}`,
-                    price1: formatCurrency(item.TwelvePrice),
-                    price2: formatCurrency(item.FortyeightPrice),
-                    trendValue1: 0,
-                    trendValue2: 0,
-                    color: getFuelColor('Gas', colors.primary),
-                    isGas: true
-                };
-            }).filter(Boolean);
-
-            const finalProcessed = [...processedFuel, ...processedGas];
-            setGasList(finalProcessed);
-            await AsyncStorage.setItem('cache_dashboard_gas', JSON.stringify(finalProcessed));
-        } catch (error) {
-            console.log("Lỗi fetch xăng Dashboard:", error);
-        } finally {
-            setLoadingGas(false);
-        }
-    };
-
-    const fetchMetals = async () => {
-        setLoadingMetal(true);
-        try {
-            const [resSJC, resDOJI, resPNJ, resSilver] = await Promise.all([
-                axios.get('https://giavang.org/trong-nuoc/sjc/').catch(() => null),
-                axios.get('https://giavang.org/trong-nuoc/doji/').catch(() => null),
-                axios.get('https://giavang.org/trong-nuoc/pnj/').catch(() => null),
-                axios.get('https://giabac.phuquygroup.vn/').catch(() => null),
-            ]);
-
-            const extractGoldPrices = (html: string | null) => {
-                const items: any[] = [];
-                if (!html) return items;
-                const root = parse(html);
-                const mainBox = root.querySelector('.gold-price-box');
-
-                if (mainBox) {
-                    const titles = mainBox.querySelectorAll('h2');
-                    titles.forEach((h2Node) => {
-                        const title = h2Node.text.trim();
-                        const row = h2Node.nextElementSibling;
-                        if (row && row.classNames.includes('row')) {
-                            let buy = row.querySelector('.box-cgre .gold-price')?.text.replace('x1000đ/lượng', '').trim() || '...';
-                            let sell = row.querySelector('.box-cred .gold-price')?.text.replace('x1000đ/lượng', '').trim() || '...';
-                            items.push({ title, buy, sell });
-                        }
-                    });
-                }
-                return items;
-            };
-
-            const sjcList = extractGoldPrices(resSJC?.data);
-            const dojiList = extractGoldPrices(resDOJI?.data);
-            const pnjList = extractGoldPrices(resPNJ?.data);
-
-            const formatGoldGroup = (brandId: string, brand: string, region: string, list: any[]) => {
-                if (list.length === 0) return { brandId, brand, region, item1: { title: 'Vàng miếng', buy: '...', sell: '...', unit: 'k/lượng' }, item2: { title: 'Vàng nhẫn', buy: '...', sell: '...', unit: 'k/lượng' } };
-                const nhan = list.find(item => item.title.toLowerCase().includes('nhẫn')) || { buy: '...', sell: '...' };
-                const mieng = list.find(item => !item.title.toLowerCase().includes('nhẫn')) || list[0];
-                return {
-                    brandId, brand, region,
-                    item1: { title: 'Vàng miếng', buy: mieng.buy, sell: mieng.sell, unit: 'k/lượng' },
-                    item2: { title: 'Vàng nhẫn', buy: nhan.buy, sell: nhan.sell, unit: 'k/lượng' }
-                };
-            };
-
-            const gData = [
-                formatGoldGroup('sjc', 'SJC', 'TP. Hồ Chí Minh', sjcList),
-                formatGoldGroup('doji', 'DOJI', 'Hà Nội', dojiList),
-                formatGoldGroup('pnj', 'PNJ', 'Hà Nội', pnjList)
-            ];
-            setDashboardGold(gData);
-            await AsyncStorage.setItem('cache_dashboard_gold', JSON.stringify(gData));
-
-            if (resSilver && resSilver.data) {
-                const root = parse(resSilver.data);
-                const silverProducts: any[] = [];
-                const productNodes = root.querySelectorAll('.col-product');
-
-                productNodes.forEach(node => {
-                    const row = node.parentNode;
-                    if (row) {
-                        const tds = row.querySelectorAll('td');
-                        if (tds.length >= 4) {
-                            let title = tds[0].text.replace(/\s+/g, ' ').trim();
-
-                            if (title.includes('BẠC MIẾNG')) title = 'Bạc miếng 1 Lượng';
-                            else if (title.includes('10 LƯỢNG')) title = 'Bạc thỏi 10 Lượng';
-                            else if (title.includes('ĐỒNG BẠC')) title = 'Đồng bạc mỹ nghệ';
-                            else if (title.includes('1KILO')) title = 'Bạc thỏi 1 Kilo';
-
-                            let unit = tds[1].text.trim().toLowerCase() === 'vnđ/kg' ? 'đ/kg' : 'đ/lượng';
-                            let buy = tds[2].text.trim();
-                            let sell = tds[3].text.trim();
-
-                            silverProducts.push({ title, unit, buy, sell });
-                        }
-                    }
-                });
-
-                if (silverProducts.length >= 4) {
-                    const sData = [
-                        { brandId: 'bac-phu-quy', brand: 'Bạc Phú Quý', region: 'Toàn quốc', item1: silverProducts[0], item2: silverProducts[1] },
-                        { brandId: 'bac-phu-quy', brand: 'Bạc Phú Quý', region: 'Toàn quốc', item1: silverProducts[2], item2: silverProducts[3] }
-                    ];
-                    setDashboardSilver(sData);
-                    await AsyncStorage.setItem('cache_dashboard_silver', JSON.stringify(sData));
-                }
-            }
-
-        } catch (error) {
-            console.log("Lỗi fetch kim loại quý:", error);
-        } finally {
-            setLoadingMetal(false);
-        }
-    };
-
-    const fetchDashboardExchange = async () => {
-        setLoadingExchange(true);
-        try {
-            const response = await axios.get('https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx');
-            const root = parse(response.data);
-            const exrates = root.querySelectorAll('exrate');
-
-            const targetCodes = ['USD', 'EUR', 'GBP', 'JPY', 'KRW'];
-            const results: any[] = [];
-
-            exrates.forEach(node => {
-                const code = node.getAttribute('currencycode') || node.getAttribute('CurrencyCode');
-                if (code && targetCodes.includes(code)) {
-                    results.push({
-                        code: code,
-                        name: (node.getAttribute('currencyname') || node.getAttribute('CurrencyName'))?.trim(),
-                        buyCash: node.getAttribute('buy') || node.getAttribute('Buy') || '-',
-                        buyTransfer: node.getAttribute('transfer') || node.getAttribute('Transfer') || '-',
-                        sellCash: node.getAttribute('sell') || node.getAttribute('Sell') || '-',
-                        sellTransfer: '-',
-                    });
-                }
-            });
-
-            results.sort((a, b) => targetCodes.indexOf(a.code) - targetCodes.indexOf(b.code));
-            setExchangeRates(results);
-            await AsyncStorage.setItem('cache_dashboard_exchange', JSON.stringify(results));
-
-        } catch (error) {
-            console.log("Lỗi fetch tỷ giá Dashboard:", error);
-        } finally {
-            setLoadingExchange(false);
-        }
-    };
-
-    const loadAllData = async () => {
-        if (!isInitialLoading) setRefreshing(true);
+    // Load initial data with cache fallback
+    const loadAllData = useCallback(async () => {
         const netState = await NetInfo.fetch();
         if (!netState.isConnected) {
             setIsOffline(true);
-            const cachedGas = await AsyncStorage.getItem('cache_dashboard_gas');
-            const cachedGold = await AsyncStorage.getItem('cache_dashboard_gold');
-            const cachedSilver = await AsyncStorage.getItem('cache_dashboard_silver');
-            const cachedEx = await AsyncStorage.getItem('cache_dashboard_exchange');
+            try {
+                const cachedGas = await AsyncStorage.getItem('cache_dashboard_gas');
+                const cachedGold = await AsyncStorage.getItem('cache_dashboard_gold');
+                const cachedSilver = await AsyncStorage.getItem('cache_dashboard_silver');
+                const cachedEx = await AsyncStorage.getItem('cache_dashboard_exchange');
 
-            if (cachedGas) setGasList(JSON.parse(cachedGas));
-            if (cachedGold) setDashboardGold(JSON.parse(cachedGold));
-            if (cachedSilver) setDashboardSilver(JSON.parse(cachedSilver));
-            if (cachedEx) setExchangeRates(JSON.parse(cachedEx));
-
-            setLoadingGas(false); setLoadingMetal(false); setLoadingExchange(false);
-            setRefreshing(false);
+                if (cachedGas) setGasList(JSON.parse(cachedGas));
+                if (cachedGold) setDashboardGold(JSON.parse(cachedGold));
+                if (cachedSilver) setDashboardSilver(JSON.parse(cachedSilver));
+                if (cachedEx) setExchangeRates(JSON.parse(cachedEx));
+            } catch (err) {
+                console.log('Lỗi đọc cache dashboard:', err);
+            }
             setIsInitialLoading(false);
+            setRefreshing(false);
             return;
         }
 
         setIsOffline(false);
-        await Promise.all([fetchDashboardGas(), fetchMetals(), fetchDashboardExchange()]);
-        setRefreshing(false);
-        setIsInitialLoading(false);
-    };
+        try {
+            const [gasRaw, metals, exRates] = await Promise.all([
+                fetchFullGasData().catch(() => null),
+                fetchDashboardMetalsData().catch(() => ({ gold: [], silver: [] })),
+                fetchDashboardExchangeData().catch(() => []),
+            ]);
+
+            if (gasRaw) {
+                const fuels = extractDashboardFuels(gasRaw, colors.primary);
+                setGasList(fuels);
+                await AsyncStorage.setItem('cache_dashboard_gas', JSON.stringify(fuels));
+            }
+
+            if (metals) {
+                setDashboardGold(metals.gold);
+                setDashboardSilver(metals.silver);
+            }
+
+            if (exRates && exRates.length > 0) {
+                setExchangeRates(exRates);
+            }
+        } catch (error) {
+            console.log('Lỗi tải dữ liệu dashboard:', error);
+        } finally {
+            setIsInitialLoading(false);
+            setRefreshing(false);
+        }
+    }, [colors.primary]);
 
     useEffect(() => {
         loadAllData();
-    }, []);
+    }, [loadAllData]);
 
     const onRefresh = useCallback(() => {
+        setRefreshing(true);
         loadAllData();
-    }, []);
+    }, [loadAllData]);
 
+    // Auto-cycle through metal items and FX display every 5.5s
     useEffect(() => {
         const currentList = activeMetal === 'gold' ? dashboardGold : dashboardSilver;
-        const len = currentList.length || 1;
+        const len = Math.max(1, currentList.length);
 
         const interval = setInterval(() => {
-            Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
-                setIsZone1(prev => !prev);
+            Animated.timing(fadeAnim, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => {
                 setMetalIndex(prev => (prev + 1) % len);
-                setExchangeStateIndex(prev => (prev + 1) % 4);
+                setExchangeStateIndex(prev => (prev + 1) % 3);
 
-                Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+                Animated.timing(fadeAnim, { toValue: 1, duration: 250, useNativeDriver: true }).start();
             });
-        }, 5000);
+        }, 5500);
 
         return () => clearInterval(interval);
-    }, [activeMetal, dashboardGold, dashboardSilver]);
+    }, [activeMetal, dashboardGold.length, dashboardSilver.length, fadeAnim]);
+
+    const handleToggleZone = () => {
+        setIsZone1(prev => !prev);
+    };
 
     const handleMetalTabChange = (tab: 'gold' | 'silver') => {
         if (tab !== activeMetal) {
@@ -326,66 +130,107 @@ export default function DashboardScreen({ navigation }: any) {
         }
     };
 
-    const GasWidget = ({ data }: any) => {
-        const { title, price1, price2, trendValue1, trendValue2, color, rawItem, isGas } = data;
+    // Calculate Market Breadth Sentiment
+    let upCount = 0;
+    let downCount = 0;
 
-        const trendValue = isZone1 ? trendValue1 : trendValue2;
-        const trendStr = trendValue > 0 ? `+${trendValue}` : trendValue < 0 ? `${trendValue}` : '0';
-        const isUp = trendValue > 0;
-        const isDown = trendValue < 0;
+    gasList.forEach(g => {
+        const trend = isZone1 ? g.trendValue1 : g.trendValue2;
+        if (trend > 0) upCount++;
+        else if (trend < 0) downCount++;
+    });
 
-        const label1 = isGas ? '12 KG' : 'VÙNG 1';
-        const label2 = isGas ? '48 KG' : 'VÙNG 2';
+    // Stable Memoized Marquee Items (Full names, clearly indicating Zone / Brand / Bank)
+    const marqueeItems = useMemo<MarqueeItem[]>(() => {
+        const items: MarqueeItem[] = [];
 
-        return (
-            <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => navigation.navigate('GasDetail', { gasItem: rawItem, provider: 'Petrolimex' })}
-                style={[styles.gasCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05 }]}
-            >
-                <View style={styles.gasCardHeader}>
-                    <View style={[styles.iconBoxMini, { backgroundColor: `${color}15` }]}>
-                        <Droplet size={18} color={color} strokeWidth={2.5} />
-                    </View>
-                    {isUp ? <TrendingUp size={16} color={colors.upColor} /> :
-                        isDown ? <TrendingDown size={16} color={colors.downColor} /> :
-                            <Minus size={16} color={colors.textSecondary} />}
-                </View>
+        // Fuels: Use full title and clearly specify zones
+        if (gasList.length > 0) {
+            gasList.forEach((fuel, idx) => {
+                items.push({
+                    id: `gas_${idx}_v1`,
+                    label: `${fuel.title} (Vùng 1)`,
+                    value: `${fuel.price1} đ`,
+                    changeText: fuel.trendValue1 !== 0 ? `${fuel.trendValue1 > 0 ? '+' : ''}${fuel.trendValue1} đ` : 'Vùng 1',
+                    isUp: fuel.trendValue1 > 0,
+                    isDown: fuel.trendValue1 < 0,
+                    category: 'gas',
+                    tickerTitle: fuel.isGas ? 'GAS' : (fuel.title.includes('Dầu') ? 'DẦU DO' : 'XĂNG'),
+                });
 
-                <View style={styles.gasCardBody}>
-                    <Text style={[styles.gasTitle, { color: colors.textSecondary }]} numberOfLines={1}>{title}</Text>
+                if (fuel.price2 && fuel.price2 !== fuel.price1 && idx < 2) {
+                    items.push({
+                        id: `gas_${idx}_v2`,
+                        label: `${fuel.title} (Vùng 2)`,
+                        value: `${fuel.price2} đ`,
+                        changeText: fuel.trendValue2 !== 0 ? `${fuel.trendValue2 > 0 ? '+' : ''}${fuel.trendValue2} đ` : 'Vùng 2',
+                        isUp: fuel.trendValue2 > 0,
+                        isDown: fuel.trendValue2 < 0,
+                        category: 'gas',
+                        tickerTitle: fuel.isGas ? 'GAS' : (fuel.title.includes('Dầu') ? 'DẦU DO' : 'XĂNG'),
+                    });
+                }
+            });
+        }
 
-                    <Animated.View style={{ opacity: fadeAnim }}>
-                        <View style={styles.priceRow}>
-                            <Text style={[styles.gasPrice, { color: colors.textPrimary }]}>
-                                {isZone1 ? price1 : price2} <Text style={styles.unit}>đ</Text>
-                            </Text>
+        // Metals: SJC, DOJI, Phú Quý Silver
+        if (dashboardGold.length > 0) {
+            const sjc = dashboardGold[0];
+            items.push({
+                id: 'gold_sjc',
+                label: `${sjc.brand} 1L - 10L (Bán)`,
+                value: `${sjc.item1.sell} k`,
+                changeText: sjc.region || 'TP.HCM',
+                isUp: true,
+                category: 'gold',
+                tickerTitle: 'GIÁ VÀNG',
+            });
+        }
 
-                            {!isZone1 && !isGas && (
-                                <View style={[styles.zoneBadge, { backgroundColor: '#e74c3c20', marginLeft: 6 }]}>
-                                    <Text style={[styles.zoneText, { color: colors.upColor }]}>+2%</Text>
-                                </View>
-                            )}
-                        </View>
+        if (dashboardGold.length > 1) {
+            const doji = dashboardGold[1];
+            items.push({
+                id: 'gold_doji',
+                label: `${doji.brand} AVPL (Bán)`,
+                value: `${doji.item1.sell} k`,
+                changeText: doji.region || 'Hà Nội',
+                isUp: true,
+                category: 'gold',
+                tickerTitle: 'GIÁ VÀNG',
+            });
+        }
 
-                        <View style={styles.trendRow}>
-                            <View style={[styles.zoneBadge, { backgroundColor: colors.border }]}>
-                                <Text style={[styles.zoneText, { color: colors.textSecondary }]}>
-                                    {isZone1 ? label1 : label2}
-                                </Text>
-                            </View>
+        if (dashboardSilver.length > 0 && dashboardSilver[0].item1.sell !== '-') {
+            const pq = dashboardSilver[0];
+            items.push({
+                id: 'silver_pq',
+                label: `${pq.brand} 999 (1 Lượng)`,
+                value: `${pq.item1.sell} đ`,
+                changeText: 'Bán ra',
+                isUp: true,
+                category: 'silver',
+                tickerTitle: 'GIÁ BẠC',
+            });
+        }
 
-                            {trendValue !== 0 && (
-                                <Text style={[styles.gasTrend, { color: isUp ? colors.upColor : colors.downColor }]}>
-                                    {trendStr} đ
-                                </Text>
-                            )}
-                        </View>
-                    </Animated.View>
-                </View>
-            </TouchableOpacity>
-        );
-    };
+        // Foreign Exchange: USD, EUR, GBP, JPY
+        const currencies = ['USD', 'EUR', 'GBP', 'JPY'];
+        currencies.forEach((code) => {
+            const rate = exchangeRates.find((r) => r.code === code);
+            if (rate) {
+                items.push({
+                    id: `rate_${code}`,
+                    label: `${rate.code} / VND (Vietcombank)`,
+                    value: formatVNRate(rate.buyCash),
+                    changeText: 'Mua TM',
+                    category: 'currency',
+                    tickerTitle: `TỶ GIÁ ${code}`,
+                });
+            }
+        });
+
+        return items;
+    }, [gasList, dashboardGold, dashboardSilver, exchangeRates]);
 
     const currentMetalData = activeMetal === 'gold'
         ? (dashboardGold[metalIndex] || dashboardGold[0])
@@ -393,275 +238,111 @@ export default function DashboardScreen({ navigation }: any) {
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor="transparent" translucent={true} />
+            <StatusBar
+                barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+                backgroundColor="transparent"
+                translucent
+            />
 
             <ScrollView
-                contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 115 }]}
+                nestedScrollEnabled={true}
+                scrollEnabled={true}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
                 showsVerticalScrollIndicator={false}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} progressViewOffset={insets.top + 115} />}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={[colors.primary]}
+                        tintColor={colors.primary}
+                        progressViewOffset={insets.top + 16}
+                    />
+                }
             >
-                {isOffline && (
-                    <View style={styles.offlineBanner}>
-                        <WifiOff size={16} color="#FFF" style={{ marginRight: 6 }} />
-                        <Text style={{ color: '#FFF', fontSize: 13, fontWeight: '700' }}>Đang ngoại tuyến. Hiển thị dữ liệu lưu tạm.</Text>
-                    </View>
+                {/* Section 0: Clean, Compact Market Header */}
+                <MarketHeader
+                    isOffline={isOffline}
+                    todayStr={todayStr}
+                    upCount={upCount}
+                    downCount={downCount}
+                />
+
+                {/* Section 1: Continuous Smooth Right-to-Left Ticker Tape (Seamless Infinite Loop) */}
+                {marqueeItems.length > 0 && (
+                    <MarketMarquee
+                        items={marqueeItems}
+                        onPressItem={(cat) => {
+                            if (cat === 'gas') navigation.navigate('Gas');
+                            else if (cat === 'silver') navigation.navigate('Gold', { activeBrand: 'bac-phu-quy' });
+                            else if (cat === 'gold') navigation.navigate('Gold', { activeBrand: activeMetal === 'silver' ? 'bac-phu-quy' : 'sjc' });
+                            else navigation.navigate('Exchange');
+                        }}
+                    />
                 )}
 
                 {isInitialLoading ? (
-                    <View style={{ marginTop: 120, alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color={colors.primary} />
-                        <Text style={{ marginTop: 16, color: colors.textSecondary, fontWeight: '600', fontSize: 15 }}>Đang tải thông tin thị trường...</Text>
                     </View>
                 ) : (
                     <>
-                        {/* --- KHỐI XĂNG DẦU --- */}
-                        <View style={styles.section}>
-                            <View style={styles.sectionHeader}>
-                                <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Xăng dầu & Gas (Petrolimex)</Text>
-                                <TouchableOpacity onPress={() => navigation.navigate('Gas')} style={styles.seeAllBtn}>
-                                    <Text style={[styles.seeAllText, { color: colors.primary }]}>Chi tiết</Text>
-                                    <ChevronRight size={16} color={colors.primary} />
-                                </TouchableOpacity>
-                            </View>
+                        {/* Section 2: Xăng dầu & Gas (Compact Zone Slider & Auto-Alternating Featured Card) */}
+                        <GasWidgetSection
+                            gasList={gasList}
+                            isZone1={isZone1}
+                            onToggleZone={handleToggleZone}
+                            fadeAnim={fadeAnim}
+                            onPressSeeAll={() => navigation.navigate('Gas')}
+                            onPressItem={(rawItem) =>
+                                navigation.navigate('GasDetail', { gasItem: rawItem, provider: 'Petrolimex' })
+                            }
+                        />
 
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
-                                {gasList.map((gas, index) => (
-                                    <GasWidget key={index} data={gas} />
-                                ))}
-                            </ScrollView>
-                        </View>
+                        {/* Section 3: Vàng bạc kim loại quý (Fully functional Gold & Phú Quý Silver) */}
+                        <MetalsCardSection
+                            activeMetal={activeMetal}
+                            onChangeTab={handleMetalTabChange}
+                            currentData={currentMetalData}
+                            allGoldBrands={dashboardGold}
+                            allSilverGroups={dashboardSilver}
+                            onSelectBrand={(idx) => setMetalIndex(idx)}
+                            currentBrandIndex={metalIndex}
+                            fadeAnim={fadeAnim}
+                            onPressSeeAll={() =>
+                                navigation.navigate('Gold', {
+                                    activeBrand: activeMetal === 'silver' ? 'bac-phu-quy' : (currentMetalData?.brandId || 'sjc')
+                                })
+                            }
+                        />
 
-                        {/* --- KHỐI KIM LOẠI QUÝ (VÀNG / BẠC) --- */}
-                        <View style={styles.section}>
-                            <View style={styles.sectionHeader}>
-                                <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Vàng bạc</Text>
-                                <TouchableOpacity onPress={() => navigation.navigate('Gold', { activeBrand: currentMetalData?.brandId })} style={styles.seeAllBtn}>
-                                    <Text style={[styles.seeAllText, { color: colors.primary }]}>Chi tiết</Text>
-                                    <ChevronRight size={16} color={colors.primary} />
-                                </TouchableOpacity>
-                            </View>
-
-                            <View style={styles.metalTabsWrapper}>
-                                <TouchableOpacity
-                                    onPress={() => handleMetalTabChange('gold')}
-                                    style={[styles.metalTab, activeMetal === 'gold' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                                >
-                                    <Text style={[styles.metalTabText, { color: activeMetal === 'gold' ? '#FFF' : colors.textSecondary }]}>Vàng</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    onPress={() => handleMetalTabChange('silver')}
-                                    style={[styles.metalTab, activeMetal === 'silver' && { backgroundColor: '#7f8c8d', borderColor: '#7f8c8d' }]}
-                                >
-                                    <Text style={[styles.metalTabText, { color: activeMetal === 'silver' ? '#FFF' : colors.textSecondary }]}>Bạc</Text>
-                                </TouchableOpacity>
-                                <Text style={[styles.noteText, { color: colors.textSecondary, flex: 1, textAlign: 'right' }]}>* Đơn vị tính tùy mặt hàng</Text>
-                            </View>
-
-                            <TouchableOpacity
-                                activeOpacity={0.7}
-                                onPress={() => navigation.navigate('Gold', { activeBrand: currentMetalData?.brandId })}
-                                style={[styles.goldDashCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05 }]}
-                            >
-                                <Animated.View style={{ opacity: fadeAnim, zIndex: 1 }}>
-                                    <View style={styles.goldDashHeader}>
-                                        <View style={[styles.iconBox, { backgroundColor: activeMetal === 'gold' ? '#F1C40F15' : '#bdc3c730', width: 40, height: 40, marginRight: 12 }]}>
-                                            <Coins size={20} color={activeMetal === 'gold' ? "#F1C40F" : "#7f8c8d"} />
-                                        </View>
-                                        <View>
-                                            <Text style={[styles.itemName, { color: colors.textPrimary, marginBottom: 2 }]}>{currentMetalData.brand}</Text>
-                                            <Text style={[styles.itemSub, { color: colors.textSecondary }]}>Khu vực: {currentMetalData.region}</Text>
-                                        </View>
-                                    </View>
-
-                                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-                                    <View style={styles.goldTypeRow}>
-                                        <Text style={[styles.goldTypeText, { color: colors.textPrimary }]}>{currentMetalData.item1?.title}</Text>
-                                        <View style={styles.goldPriceBlock}>
-                                            <View style={{ alignItems: 'flex-end' }}>
-                                                <Text style={[styles.subPrice, { color: colors.downColor }]}>{currentMetalData.item1?.buy}</Text>
-                                                <Text style={styles.unitSmall}>{currentMetalData.item1?.unit} mua</Text>
-                                            </View>
-                                            <View style={{ width: 1, height: 20, backgroundColor: colors.border, marginHorizontal: 8 }} />
-                                            <View style={{ alignItems: 'flex-end' }}>
-                                                <Text style={[styles.itemPrice, { color: colors.upColor }]}>{currentMetalData.item1?.sell}</Text>
-                                                <Text style={styles.unitSmall}>{currentMetalData.item1?.unit} bán</Text>
-                                            </View>
-                                        </View>
-                                    </View>
-
-                                    <View style={[styles.goldTypeRow, { marginTop: 14 }]}>
-                                        <Text style={[styles.goldTypeText, { color: colors.textPrimary }]}>{currentMetalData.item2?.title}</Text>
-                                        <View style={styles.goldPriceBlock}>
-                                            <View style={{ alignItems: 'flex-end' }}>
-                                                <Text style={[styles.subPrice, { color: colors.downColor }]}>{currentMetalData.item2?.buy}</Text>
-                                                <Text style={styles.unitSmall}>{currentMetalData.item2?.unit} mua</Text>
-                                            </View>
-                                            <View style={{ width: 1, height: 20, backgroundColor: colors.border, marginHorizontal: 8 }} />
-                                            <View style={{ alignItems: 'flex-end' }}>
-                                                <Text style={[styles.itemPrice, { color: colors.upColor }]}>{currentMetalData.item2?.sell}</Text>
-                                                <Text style={styles.unitSmall}>{currentMetalData.item2?.unit} bán</Text>
-                                            </View>
-                                        </View>
-                                    </View>
-                                </Animated.View>
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* --- KHỐI TỶ GIÁ --- */}
-                        <View style={styles.section}>
-                            <View style={styles.sectionHeader}>
-                                <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Tỷ giá (Vietcombank)</Text>
-                                <TouchableOpacity onPress={() => navigation.navigate('Exchange', { activeBank: 'vcb' })} style={styles.seeAllBtn}>
-                                    <Text style={[styles.seeAllText, { color: colors.primary }]}>Chi tiết</Text>
-                                    <ChevronRight size={16} color={colors.primary} />
-                                </TouchableOpacity>
-                            </View>
-
-                            <TouchableOpacity
-                                activeOpacity={0.7}
-                                onPress={() => navigation.navigate('Exchange', { activeBank: 'vcb' })}
-                                style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowOpacity: isDarkMode ? 0 : 0.05 }]}
-                            >
-                                <Animated.View style={{ opacity: fadeAnim }}>
-                                    {exchangeRates.map((rate, index) => {
-                                        const cleanCode = rate.code.split('(')[0].trim();
-                                        const countryCode = cleanCode.length >= 2 ? cleanCode.substring(0, 2) : 'UN';
-                                        const flagUrl = getLogo(cleanCode) || `https://flagsapi.com/${countryCode}/flat/64.png`;
-
-                                        const isLast = index === exchangeRates.length - 1;
-                                        const iconBgColors = ['#27AE6015', '#2980b915', '#8e44ad15', '#e67e2215', '#e74c3c15'];
-
-                                        let currentPrice = '';
-                                        let currentLabel = '';
-                                        let priceColor = colors.textPrimary;
-
-                                        if (exchangeStateIndex === 0) {
-                                            currentPrice = formatVNRate(rate.buyCash);
-                                            currentLabel = 'Mua TM';
-                                            priceColor = colors.downColor;
-                                        } else if (exchangeStateIndex === 1) {
-                                            currentPrice = formatVNRate(rate.sellCash);
-                                            currentLabel = 'Bán TM';
-                                            priceColor = colors.upColor;
-                                        } else if (exchangeStateIndex === 2) {
-                                            currentPrice = formatVNRate(rate.buyTransfer);
-                                            currentLabel = 'Mua CK';
-                                            priceColor = colors.downColor;
-                                        } else if (exchangeStateIndex === 3) {
-                                            currentPrice = formatVNRate(rate.sellTransfer);
-                                            currentLabel = 'Bán CK';
-                                            priceColor = colors.upColor;
-                                        }
-
-                                        return (
-                                            <React.Fragment key={rate.code}>
-                                                <View style={styles.listRow}>
-                                                    <View style={styles.listRowLeft}>
-                                                        <View style={[styles.iconBox, { backgroundColor: iconBgColors[index % 5] }]}>
-                                                            <Image source={{ uri: flagUrl }} style={{ width: 28, height: 28, borderRadius: 14 }} resizeMode="cover" />
-                                                        </View>
-                                                        <View>
-                                                            <Text style={[styles.itemName, { color: colors.textPrimary }]}>{rate.code}</Text>
-                                                            <Text style={[styles.itemSub, { color: colors.textSecondary }]}>{rate.name}</Text>
-                                                        </View>
-                                                    </View>
-                                                    <View style={{ alignItems: 'flex-end' }}>
-                                                        <Text style={[styles.itemPrice, { color: priceColor }]}>
-                                                            {currentPrice} {currentPrice !== '-' && <Text style={styles.unit}>đ</Text>}
-                                                        </Text>
-                                                        <Text style={[styles.gasTrend, { color: colors.textSecondary }]}>{currentLabel}</Text>
-                                                    </View>
-                                                </View>
-                                                {!isLast && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
-                                            </React.Fragment>
-                                        );
-                                    })}
-                                </Animated.View>
-                            </TouchableOpacity>
-                        </View>
+                        {/* Section 4: Tỷ giá ngoại tệ (Segmented Slider & Currency Matrix) */}
+                        <ExchangeCardSection
+                            rates={exchangeRates}
+                            exchangeStateIndex={exchangeStateIndex}
+                            onChangeModeIndex={setExchangeStateIndex}
+                            fadeAnim={fadeAnim}
+                            onPressSeeAll={() =>
+                                navigation.navigate('Exchange', { activeBank: 'vcb' })
+                            }
+                        />
                     </>
                 )}
             </ScrollView>
-
-            <BlurView
-                intensity={100}
-                tint={isDarkMode ? 'dark' : 'light'}
-                style={[
-                    styles.fixedHeader,
-                    {
-                        paddingTop: insets.top,
-                        backgroundColor: isDarkMode ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.85)'
-                    }
-                ]}
-            >
-                <View style={styles.headerContent}>
-                    <Text style={[styles.greeting, { color: colors.textSecondary }]}>Tổng quan thị trường</Text>
-                    <View style={styles.titleRow}>
-                        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Hôm nay</Text>
-                        <View style={[styles.dateBadge, { backgroundColor: colors.border }]}>
-                            <Text style={[styles.dateText, { color: colors.textSecondary }]}>{todayStr}</Text>
-                        </View>
-                    </View>
-                </View>
-            </BlurView>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1 },
-
-    offlineBanner: { backgroundColor: '#e74c3c', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, marginHorizontal: 16, borderRadius: 8, marginBottom: 12 },
-
-    fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
-    headerContent: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15 },
-    greeting: { fontSize: 14, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
-    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    headerTitle: { fontSize: 32, fontWeight: '900', letterSpacing: -0.5 },
-    dateBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, justifyContent: 'center' },
-    dateText: { fontSize: 13, fontWeight: '700' },
-
-    scrollContent: { paddingBottom: 40 },
-
-    section: { marginBottom: 28 },
-    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, paddingHorizontal: 16 },
-    sectionTitle: { fontSize: 18, fontWeight: '700' },
-    seeAllBtn: { flexDirection: 'row', alignItems: 'center' },
-    seeAllText: { fontSize: 14, fontWeight: '600', marginRight: 2 },
-
-    gasCard: { width: 155, padding: 16, borderRadius: 20, borderWidth: 1, marginRight: 12, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowRadius: 8 },
-    gasCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-    iconBoxMini: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-    gasCardBody: { gap: 4 },
-    gasTitle: { fontSize: 13, fontWeight: '700', marginBottom: 2 },
-    priceRow: { flexDirection: 'row', alignItems: 'center' },
-    gasPrice: { fontSize: 18, fontWeight: '900', letterSpacing: -0.5 },
-    trendRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
-    zoneBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-    zoneText: { fontSize: 10, fontWeight: '800' },
-    gasTrend: { fontSize: 12, fontWeight: '700' },
-
-    metalTabsWrapper: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12, gap: 8 },
-    metalTab: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: '#ccc' },
-    metalTabText: { fontSize: 12, fontWeight: '700' },
-    noteText: { fontSize: 11, fontStyle: 'italic' },
-
-    goldDashCard: { marginHorizontal: 16, borderRadius: 20, borderWidth: 1, padding: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowRadius: 8 },
-    goldDashHeader: { flexDirection: 'row', alignItems: 'center' },
-    goldTypeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    goldTypeText: { fontSize: 14, fontWeight: '700', flex: 1, paddingRight: 8 },
-    goldPriceBlock: { flexDirection: 'row', alignItems: 'center' },
-    unitSmall: { fontSize: 10, color: '#7f8c8d', fontWeight: '500', marginTop: 2 },
-
-    listCard: { marginHorizontal: 16, borderRadius: 20, borderWidth: 1, padding: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowRadius: 8 },
-    listRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
-    listRowLeft: { flexDirection: 'row', alignItems: 'center' },
-    iconBox: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
-    itemName: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
-    itemSub: { fontSize: 13, fontWeight: '500' },
-    itemPrice: { fontSize: 16, fontWeight: '800' },
-    subPrice: { fontSize: 15, fontWeight: '700' },
-    unit: { fontSize: 12, fontWeight: '600' },
-    divider: { height: 1, marginVertical: 14 },
+    container: {
+        flex: 1,
+    },
+    scrollContent: {
+        paddingBottom: 24,
+    },
+    loadingContainer: {
+        paddingTop: 80,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
 });
