@@ -1,11 +1,32 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, StatusBar, Image, Animated, Pressable } from 'react-native';
+import {
+    View,
+    Text,
+    StyleSheet,
+    TouchableOpacity,
+    ActivityIndicator,
+    ScrollView,
+    StatusBar,
+    Image,
+    Animated,
+    Pressable,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, CalendarDays, TrendingUp, TrendingDown, Minus, ChevronDown, Droplet } from 'lucide-react-native';
+import { ChevronLeft, CalendarDays, ChevronDown, Droplet, Flame } from 'lucide-react-native';
 import axios from 'axios';
 import { BlurView } from 'expo-blur';
-import { getPreviousDay, formatCurrency, getLogo, getFuelColor, formatDate } from '../utils/helpers';
+import {
+    getPreviousDay,
+    formatCurrency,
+    getLogo,
+    getFuelColor,
+    formatDate,
+    isFuelTitleMatch,
+    getCleanFuelDisplayTitle,
+} from '../utils/helpers';
 import { useTheme } from '../theme/ThemeContext';
+import { FONTS } from '../theme/typography';
+import { TrendBadge } from '../components/common/TrendBadge';
 
 export default function GasDetailScreen({ route, navigation }: any) {
     const { gasItem, provider } = route.params;
@@ -39,7 +60,7 @@ export default function GasDetailScreen({ route, navigation }: any) {
                 toValue: (visible[i].zone1_price - min) / range,
                 duration: 600,
                 delay: i * 80,
-                useNativeDriver: false
+                useNativeDriver: false,
             })
         );
 
@@ -68,7 +89,7 @@ export default function GasDetailScreen({ route, navigation }: any) {
                 zone1_price: currentKnownPrice1,
                 zone2_price: currentKnownPrice2,
                 change1: 0,
-                change2: 0
+                change2: 0,
             });
             setHistoryData(history);
             setLoading(false);
@@ -85,7 +106,7 @@ export default function GasDetailScreen({ route, navigation }: any) {
             try {
                 const response = await axios.get(`https://giaxanghomnay.com/api/pvdate/${prevDate}`);
                 let prevData = isPetrolimex ? (response.data[0] || []) : (response.data[1] || []);
-                let prevItem = prevData.find((y: any) => y.title === gasItem.title);
+                let prevItem = prevData.find((y: any) => isFuelTitleMatch(y.title, gasItem.title));
 
                 if (prevItem) {
                     let p1 = isPetrolimex ? prevItem.zone1_price : prevItem.price;
@@ -97,7 +118,7 @@ export default function GasDetailScreen({ route, navigation }: any) {
                             zone1_price: currentKnownPrice1,
                             zone2_price: currentKnownPrice2,
                             change1: currentKnownPrice1 - p1,
-                            change2: currentKnownPrice2 - p2
+                            change2: currentKnownPrice2 - p2,
                         });
                         currentKnownPrice1 = p1;
                         currentKnownPrice2 = p2;
@@ -107,7 +128,7 @@ export default function GasDetailScreen({ route, navigation }: any) {
                     }
                 }
             } catch (error) { }
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, 80));
             searchDate = prevDate;
             attempts++;
         }
@@ -117,7 +138,8 @@ export default function GasDetailScreen({ route, navigation }: any) {
                 date: effectiveDate,
                 zone1_price: currentKnownPrice1,
                 zone2_price: currentKnownPrice2,
-                change1: 0, change2: 0
+                change1: 0,
+                change2: 0,
             });
         }
 
@@ -131,14 +153,7 @@ export default function GasDetailScreen({ route, navigation }: any) {
         }
     };
 
-    const displayTitle = gasItem.title.replace(/^Xăng\s+/i, '');
-
-    const renderTrend = (change: number, size = 14) => {
-        if (change > 0) return <TrendingUp size={size} color={colors.upColor} />;
-        if (change < 0) return <TrendingDown size={size} color={colors.downColor} />;
-        return <Minus size={size} color={colors.textSecondary} />;
-    };
-
+    const displayTitle = getCleanFuelDisplayTitle(gasItem.title);
     const fuelColor = getFuelColor(gasItem.title, colors.primary);
 
     const scrollRef = useRef<ScrollView>(null);
@@ -154,13 +169,13 @@ export default function GasDetailScreen({ route, navigation }: any) {
             <View style={[styles.chartContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={styles.chartHeaderRow}>
                     <Text style={[styles.chartTitle, { color: colors.textPrimary }]}>
-                        Biểu đồ biến động
+                        Biểu đồ biến động giá
                     </Text>
                     {isPetrolimex && (
                         <View style={styles.chartLegend}>
                             <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
                             <Text style={[styles.legendText, { color: colors.textSecondary }]}>{isGas ? '12kg' : 'Vùng 1'}</Text>
-                            <View style={[styles.legendDot, { backgroundColor: '#e74c3c', marginLeft: 12 }]} />
+                            <View style={[styles.legendDot, { backgroundColor: colors.secondary, marginLeft: 12 }]} />
                             <Text style={[styles.legendText, { color: colors.textSecondary }]}>{isGas ? '48kg' : 'Vùng 2'}</Text>
                         </View>
                     )}
@@ -180,21 +195,21 @@ export default function GasDetailScreen({ route, navigation }: any) {
 
                             const zone1Height = val.interpolate({
                                 inputRange: [0, 1],
-                                outputRange: [0, 100]
+                                outputRange: [0, 100],
                             });
 
                             const zone2Height = isPetrolimex ? val.interpolate({
                                 inputRange: [0, 1],
-                                outputRange: [6, 106]
+                                outputRange: [6, 106],
                             }) : new Animated.Value(0);
 
                             return (
                                 <View key={index} style={styles.barCol}>
                                     <Text style={[
                                         styles.barValue,
-                                        { color: isLatest ? colors.primary : colors.textSecondary }
+                                        { color: isLatest ? colors.primary : colors.textSecondary },
                                     ]}>
-                                        {Math.round(item.zone1_price / 1000)}
+                                        {Math.round(item.zone1_price / 1000)}k
                                     </Text>
 
                                     <Pressable onPress={() => setSelectedIndex(selectedIndex === index ? null : index)}>
@@ -205,10 +220,10 @@ export default function GasDetailScreen({ route, navigation }: any) {
                                                         styles.barFill,
                                                         {
                                                             height: zone2Height,
-                                                            backgroundColor: isLatest ? '#e74c3c' : colors.border,
+                                                            backgroundColor: isLatest ? colors.secondary : colors.border,
                                                             position: 'absolute',
                                                             bottom: 0,
-                                                        }
+                                                        },
                                                     ]}
                                                 />
                                             )}
@@ -220,19 +235,19 @@ export default function GasDetailScreen({ route, navigation }: any) {
                                                         backgroundColor: isLatest ? colors.primary : colors.textSecondary,
                                                         position: 'absolute',
                                                         bottom: 0,
-                                                    }
+                                                    },
                                                 ]}
                                             />
                                         </View>
                                     </Pressable>
 
                                     {selectedIndex === index && (
-                                        <View style={[styles.tooltip, { backgroundColor: isDarkMode ? '#333' : '#FFF', borderColor: colors.border }]}>
-                                            <Text style={{ color: colors.textPrimary, fontSize: 11, fontWeight: 'bold' }}>
+                                        <View style={[styles.tooltip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                                            <Text style={{ color: colors.textPrimary, fontSize: 11, fontFamily: FONTS.bold }}>
                                                 {isGas ? '12kg' : 'V1'}: {formatCurrency(item.zone1_price)}
                                             </Text>
                                             {isPetrolimex && (
-                                                <Text style={{ color: '#e74c3c', fontSize: 10, fontWeight: 'bold', marginTop: 2 }}>
+                                                <Text style={{ color: colors.secondary, fontSize: 10, fontFamily: FONTS.bold, marginTop: 2 }}>
                                                     {isGas ? '48kg' : 'V2'}: {formatCurrency(item.zone2_price)}
                                                 </Text>
                                             )}
@@ -252,17 +267,28 @@ export default function GasDetailScreen({ route, navigation }: any) {
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={colors.background} />
+            <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
             <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 80, paddingTop: insets.top + 60 }} showsVerticalScrollIndicator={false}>
 
-                <View style={[styles.overviewCard, { backgroundColor: colors.surface, borderColor: colors.border, overflow: 'hidden' }]}>
+                {/* Overview Card */}
+                <View style={[styles.overviewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <View style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center', zIndex: 0 }]}>
-                        {logoUrl && <Image source={{ uri: logoUrl }} style={{ width: 160, height: 160, opacity: 0.05 }} resizeMode="contain" blurRadius={1.5} />}
+                        {logoUrl && (
+                            <Image
+                                source={{ uri: logoUrl }}
+                                style={{ width: 140, height: 140, opacity: isDarkMode ? 0.03 : 0.04 }}
+                                resizeMode="contain"
+                            />
+                        )}
                     </View>
 
                     <View style={[styles.iconBox, { backgroundColor: `${fuelColor}15`, zIndex: 1 }]}>
-                        <Droplet size={32} color={fuelColor} />
+                        {isGas ? (
+                            <Flame size={30} color={fuelColor} strokeWidth={2.2} />
+                        ) : (
+                            <Droplet size={30} color={fuelColor} strokeWidth={2.5} />
+                        )}
                     </View>
                     <Text style={[styles.gasName, { color: colors.textPrimary, zIndex: 1 }]}>{displayTitle}</Text>
                     <Text style={[styles.providerName, { color: colors.textSecondary, zIndex: 1 }]}>{provider}</Text>
@@ -272,12 +298,16 @@ export default function GasDetailScreen({ route, navigation }: any) {
                     <View style={[styles.priceOverviewRow, { zIndex: 1 }]}>
                         <View style={styles.priceBlock}>
                             <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>{isGas ? '12 KG' : 'VÙNG 1'}</Text>
-                            <Text style={[styles.bigPrice, { color: colors.textPrimary }]}>{formatCurrency(isPetrolimex ? gasItem.zone1_price : gasItem.price)} đ</Text>
+                            <Text style={[styles.bigPrice, { color: colors.textPrimary }]}>
+                                {formatCurrency(isPetrolimex ? gasItem.zone1_price : gasItem.price)} đ
+                            </Text>
                         </View>
                         {isPetrolimex && (
                             <View style={styles.priceBlock}>
                                 <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>{isGas ? '48 KG' : 'VÙNG 2 (+2%)'}</Text>
-                                <Text style={[styles.bigPrice, { color: colors.textPrimary }]}>{formatCurrency(gasItem.zone2_price)} đ</Text>
+                                <Text style={[styles.bigPrice, { color: colors.textPrimary }]}>
+                                    {formatCurrency(gasItem.zone2_price)} đ
+                                </Text>
                             </View>
                         )}
                     </View>
@@ -289,7 +319,7 @@ export default function GasDetailScreen({ route, navigation }: any) {
                     <>
                         {renderChart()}
 
-                        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Lịch sử thay đổi</Text>
+                        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Lịch sử điều chỉnh giá</Text>
                         <View style={[styles.timelineCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                             {visibleHistory.map((item, index) => {
                                 const isFirst = index === 0;
@@ -306,7 +336,7 @@ export default function GasDetailScreen({ route, navigation }: any) {
 
                                         <View style={styles.timelineContent}>
                                             <View style={styles.timeRow}>
-                                                <CalendarDays size={14} color={colors.textSecondary} />
+                                                <CalendarDays size={13} color={colors.textSecondary} />
                                                 <Text style={[styles.dateText, { color: isFirst ? colors.primary : colors.textSecondary }]}>
                                                     Ngày hiệu lực: {dateStr}
                                                 </Text>
@@ -317,29 +347,15 @@ export default function GasDetailScreen({ route, navigation }: any) {
                                                     <Text style={[styles.hPrice, { color: colors.textPrimary }]}>
                                                         {formatCurrency(item.zone1_price)} đ
                                                     </Text>
-                                                    {item.change1 !== 0 && (
-                                                        <View style={[styles.changeBadge, { backgroundColor: item.change1 > 0 ? `${colors.upColor}15` : `${colors.downColor}15` }]}>
-                                                            {renderTrend(item.change1)}
-                                                            <Text style={[styles.changeText, { color: item.change1 > 0 ? colors.upColor : colors.downColor }]}>
-                                                                {Math.abs(item.change1)}
-                                                            </Text>
-                                                        </View>
-                                                    )}
+                                                    <TrendBadge value={item.change1} />
                                                 </View>
 
                                                 {isPetrolimex && (
-                                                    <View style={[styles.priceChangeRow, { marginTop: 4 }]}>
+                                                    <View style={[styles.priceChangeRow, { marginTop: 6 }]}>
                                                         <Text style={[styles.hPriceSub, { color: colors.textSecondary }]}>
                                                             {isGas ? '48kg' : 'V2'}: {formatCurrency(item.zone2_price)} đ
                                                         </Text>
-                                                        {item.change2 !== 0 && (
-                                                            <View style={[styles.changeBadge, { paddingVertical: 2, paddingHorizontal: 6, backgroundColor: item.change2 > 0 ? `${colors.upColor}15` : `${colors.downColor}15` }]}>
-                                                                {renderTrend(item.change2, 12)}
-                                                                <Text style={[styles.changeText, { fontSize: 11, color: item.change2 > 0 ? colors.upColor : colors.downColor }]}>
-                                                                    {Math.abs(item.change2)}
-                                                                </Text>
-                                                            </View>
-                                                        )}
+                                                        <TrendBadge value={item.change2} size="sm" />
                                                     </View>
                                                 )}
                                             </View>
@@ -351,15 +367,13 @@ export default function GasDetailScreen({ route, navigation }: any) {
                             {hasMoreData && (
                                 <TouchableOpacity
                                     onPress={handleLoadMore}
-                                    style={[
-                                        styles.loadMoreBtn,
-                                        { borderColor: colors.border }
-                                    ]}
+                                    style={[styles.loadMoreBtn, { borderColor: colors.border }]}
+                                    activeOpacity={0.7}
                                 >
                                     <Text style={[styles.loadMoreText, { color: colors.primary }]}>
-                                        Xem thêm 5 lần điều chỉnh
+                                        Xem thêm 5 kỳ điều chỉnh trước
                                     </Text>
-                                    <ChevronDown size={16} color={colors.primary} style={{ marginTop: 2 }} />
+                                    <ChevronDown size={15} color={colors.primary} />
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -367,17 +381,30 @@ export default function GasDetailScreen({ route, navigation }: any) {
                 )}
             </ScrollView>
 
-            <BlurView intensity={100} tint={isDarkMode ? 'dark' : 'light'} style={[styles.fixedHeader, { paddingTop: insets.top, backgroundColor: isDarkMode ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.85)' }]}>
+            {/* Fixed Header */}
+            <BlurView
+                intensity={80}
+                tint={isDarkMode ? 'dark' : 'light'}
+                style={[
+                    styles.fixedHeader,
+                    {
+                        paddingTop: insets.top,
+                        backgroundColor: isDarkMode ? 'rgba(11,15,25,0.85)' : 'rgba(248,250,252,0.85)',
+                    },
+                ]}
+            >
                 <View style={styles.headerContent}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backBtn, { backgroundColor: isDarkMode ? '#2c2c2e' : '#f0f0f0' }]}>
-                        <ChevronLeft size={24} color={colors.textPrimary} />
+                    <TouchableOpacity
+                        onPress={() => navigation.goBack()}
+                        style={[styles.backBtn, { backgroundColor: colors.surfaceSubtle }]}
+                        activeOpacity={0.7}
+                    >
+                        <ChevronLeft size={22} color={colors.textPrimary} />
                     </TouchableOpacity>
-                    <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Chi tiết giá</Text>
+                    <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Chi tiết nhiên liệu</Text>
                     <View style={{ width: 40 }} />
                 </View>
             </BlurView>
-
-            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.max(insets.bottom, 20), backgroundColor: colors.background, zIndex: 10 }} />
         </View>
     );
 }
@@ -385,47 +412,67 @@ export default function GasDetailScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
     container: { flex: 1 },
     fixedHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
-    headerContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 15, paddingTop: 10 },
-    backBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-    headerTitle: { fontSize: 18, fontWeight: 'bold' },
+    headerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingBottom: 14,
+        paddingTop: 8,
+    },
+    backBtn: { width: 38, height: 38, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+    headerTitle: { fontFamily: FONTS.bold, fontSize: 17 },
 
-    overviewCard: { marginHorizontal: 16, marginTop: 16, padding: 24, borderRadius: 24, borderWidth: 1, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-    iconBox: { width: 64, height: 64, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 12, padding: 10 },
-    gasName: { fontSize: 24, fontWeight: '900', letterSpacing: -0.5, marginBottom: 4, textAlign: 'center' },
-    providerName: { fontSize: 14, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
-    divider: { height: 1, width: '100%', marginVertical: 20 },
+    overviewCard: {
+        marginHorizontal: 20,
+        marginTop: 16,
+        padding: 24,
+        borderRadius: 24,
+        borderWidth: 1,
+        alignItems: 'center',
+        elevation: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        overflow: 'hidden',
+    },
+    iconBox: { width: 60, height: 60, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+    gasName: { fontFamily: FONTS.black, fontSize: 22, letterSpacing: -0.4, marginBottom: 4, textAlign: 'center' },
+    providerName: { fontFamily: FONTS.bold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
+    divider: { height: 1, width: '100%', marginVertical: 18 },
     priceOverviewRow: { flexDirection: 'row', width: '100%', justifyContent: 'space-around' },
     priceBlock: { alignItems: 'center' },
-    priceLabel: { fontSize: 12, fontWeight: '700', marginBottom: 4 },
-    bigPrice: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
+    priceLabel: { fontFamily: FONTS.bold, fontSize: 11, marginBottom: 4, textTransform: 'uppercase' },
+    bigPrice: { fontFamily: FONTS.black, fontSize: 20, letterSpacing: -0.5 },
 
-    chartContainer: { marginHorizontal: 16, marginTop: 24, padding: 20, paddingBottom: 10, borderRadius: 24, borderWidth: 1 },
+    chartContainer: { marginHorizontal: 20, marginTop: 24, padding: 20, paddingBottom: 10, borderRadius: 24, borderWidth: 1 },
     chartHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-    chartTitle: { fontSize: 15, fontWeight: '700' },
+    chartTitle: { fontFamily: FONTS.bold, fontSize: 15 },
     chartLegend: { flexDirection: 'row', alignItems: 'center' },
     legendDot: { width: 8, height: 8, borderRadius: 4, marginRight: 4 },
-    legendText: { fontSize: 11, fontWeight: '600' },
+    legendText: { fontFamily: FONTS.medium, fontSize: 11 },
 
     barsWrapper: {
         flexDirection: 'row',
         alignItems: 'flex-end',
         height: 140,
         gap: 16,
-        paddingHorizontal: 10
+        paddingHorizontal: 10,
     },
     barCol: {
         alignItems: 'center',
-        width: 32
+        width: 32,
     },
     barGroup: {
         height: 110,
         justifyContent: 'flex-end',
         width: 20,
     },
-    barValue: { fontSize: 11, fontWeight: '700', marginBottom: 6, textAlign: 'center' },
+    barValue: { fontFamily: FONTS.bold, fontSize: 11, marginBottom: 6, textAlign: 'center' },
     barFill: {
         width: 20,
-        borderRadius: 6
+        borderRadius: 6,
     },
     tooltip: {
         position: 'absolute',
@@ -436,32 +483,26 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         zIndex: 20,
         alignItems: 'center',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-        minWidth: 75
+        minWidth: 75,
     },
 
-    sectionTitle: { fontSize: 18, fontWeight: '800', marginHorizontal: 20, marginTop: 32, marginBottom: 16 },
-    timelineCard: { marginHorizontal: 16, padding: 20, borderRadius: 24, borderWidth: 1 },
+    sectionTitle: { fontFamily: FONTS.extraBold, fontSize: 17, marginHorizontal: 20, marginTop: 28, marginBottom: 14 },
+    timelineCard: { marginHorizontal: 20, padding: 20, borderRadius: 24, borderWidth: 1 },
     timelineRow: { flexDirection: 'row' },
-    timelineLineCol: { width: 24, alignItems: 'center' },
+    timelineLineCol: { width: 20, alignItems: 'center' },
     lineTop: { width: 2, flex: 1 },
     lineBottom: { width: 2, flex: 1 },
-    dot: { width: 12, height: 12, borderRadius: 6, marginVertical: 4 },
+    dot: { width: 10, height: 10, borderRadius: 5, marginVertical: 4 },
 
-    timelineContent: { flex: 1, paddingBottom: 24, paddingLeft: 12 },
-    timeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-    dateText: { fontSize: 13, fontWeight: '700' },
+    timelineContent: { flex: 1, paddingBottom: 22, paddingLeft: 12 },
+    timeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+    dateText: { fontFamily: FONTS.semiBold, fontSize: 12 },
 
     historyPriceBlock: { flexDirection: 'column' },
     priceChangeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    hPrice: { fontSize: 17, fontWeight: '800' },
-    hPriceSub: { fontSize: 14, fontWeight: '600' },
-    changeBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, gap: 4 },
-    changeText: { fontSize: 13, fontWeight: '700' },
+    hPrice: { fontFamily: FONTS.extraBold, fontSize: 16, letterSpacing: -0.3 },
+    hPriceSub: { fontFamily: FONTS.semiBold, fontSize: 13 },
 
     loadMoreBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderTopWidth: 1, marginTop: 10, gap: 4 },
-    loadMoreText: { fontSize: 14, fontWeight: '700' }
+    loadMoreText: { fontFamily: FONTS.bold, fontSize: 13 },
 });
