@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, Animated, ActivityIndicator, RefreshControl, StatusBar } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../theme/ThemeContext';
@@ -240,25 +240,13 @@ export default function DashboardScreen({ navigation }: any) {
         <View style={[styles.container, { backgroundColor: colors.background }]}>
             <StatusBar
                 barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-                backgroundColor="transparent"
-                translucent
+                backgroundColor={colors.background}
             />
 
-            <ScrollView
-                nestedScrollEnabled={true}
-                scrollEnabled={true}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
-                showsVerticalScrollIndicator={false}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        colors={[colors.primary]}
-                        tintColor={colors.primary}
-                        progressViewOffset={insets.top + 16}
-                    />
-                }
+            {/* Fixed Top Header & Ticker Tape (Sticky like Gas, Gold & Exchange screens) */}
+            <SafeAreaView
+                style={[styles.fixedHeaderContainer, { backgroundColor: colors.background }]}
+                edges={['top', 'left', 'right']}
             >
                 {/* Section 0: Clean, Compact Market Header */}
                 <MarketHeader
@@ -280,7 +268,24 @@ export default function DashboardScreen({ navigation }: any) {
                         }}
                     />
                 )}
+            </SafeAreaView>
 
+            {/* Scrollable Content starting from Gas & Fuels downwards */}
+            <ScrollView
+                nestedScrollEnabled={true}
+                scrollEnabled={true}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={[colors.primary]}
+                        tintColor={colors.primary}
+                    />
+                }
+            >
                 {isInitialLoading ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color={colors.primary} />
@@ -337,8 +342,14 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
+    fixedHeaderContainer: {
+        paddingBottom: 6,
+        zIndex: 20,
+        elevation: 4,
+    },
     scrollContent: {
-        paddingBottom: 24,
+        paddingTop: 20,
+        paddingBottom: 20,
     },
     loadingContainer: {
         paddingTop: 80,
